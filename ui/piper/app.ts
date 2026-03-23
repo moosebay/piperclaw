@@ -182,48 +182,46 @@ export class PiperApp extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    // Auto-connect if on same host as gateway
-    this.autoConnect();
+    const token = new URLSearchParams(window.location.search).get("token") ?? "";
+    if (token) {
+      this.connectWithToken(token);
+    }
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    this.client?.close();
+    this.client?.stop();
   }
 
-  private async autoConnect() {
-    const token = new URLSearchParams(window.location.search).get("token") ?? "";
-    if (token) {
-      await this.connect(token);
-    }
-  }
-
-  private async connect(token: string) {
+  private connectWithToken(token: string) {
     this.connecting = true;
     this.error = null;
-    try {
-      const wsUrl = `ws://${window.location.host}`;
-      const client = new GatewayBrowserClient();
-      const hello = await client.connect(wsUrl, {
-        mode: "ui" as any,
-        name: "piper-dashboard" as any,
-        scopes: ["operator.read", "operator.write"],
-        auth: { mode: "token", token },
-      });
-      this.client = client;
-      this.hello = hello;
-      this.connected = true;
-
-      // Subscribe to real-time events
-      client.on("task.status", () => this.refresh());
-      client.on("objective.progress", () => this.refreshObjectives());
-
-      await this.refresh();
-    } catch (err) {
-      this.error = err instanceof Error ? err.message : String(err);
-    } finally {
-      this.connecting = false;
-    }
+    const wsUrl = `ws://${window.location.host}`;
+    const client = new GatewayBrowserClient({
+      url: wsUrl,
+      token,
+      mode: "ui" as any,
+      clientName: "piper" as any,
+      onHello: (hello) => {
+        this.hello = hello;
+        this.connected = true;
+        this.connecting = false;
+        void this.refresh();
+      },
+      onEvent: (evt) => {
+        if (evt.event === "task.status" || evt.event === "objective.progress") {
+          void this.refresh();
+        }
+      },
+      onClose: ({ reason }) => {
+        this.connected = false;
+        if (reason && !this.error) {
+          this.error = reason;
+        }
+      },
+    });
+    this.client = client;
+    client.start();
   }
 
   private async refresh() {
@@ -275,7 +273,7 @@ export class PiperApp extends LitElement {
             @keydown=${(e: KeyboardEvent) => {
               if (e.key === "Enter") {
                 const input = this.shadowRoot?.getElementById("token-input") as HTMLInputElement;
-                void this.connect(input.value.trim());
+                this.connectWithToken(input.value.trim());
               }
             }}
           />
@@ -283,7 +281,7 @@ export class PiperApp extends LitElement {
             ?disabled=${this.connecting}
             @click=${() => {
               const input = this.shadowRoot?.getElementById("token-input") as HTMLInputElement;
-              void this.connect(input.value.trim());
+              this.connectWithToken(input.value.trim());
             }}
           >
             ${this.connecting ? "Connecting..." : "Connect"}
