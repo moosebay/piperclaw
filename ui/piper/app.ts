@@ -316,8 +316,8 @@ export class PiperApp extends LitElement {
             Audit Log
           </a>
           <a class="sidebar-item" ?data-active=${tab === "skills"} @click=${() => this.setTab("skills")}>
-            <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            Skills
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Hierarchy
           </a>
         </div>
 
@@ -418,7 +418,7 @@ export class PiperApp extends LitElement {
     const managers = piperSkills.filter((s) => s.piper.role === "manager");
     const workers = piperSkills.filter((s) => s.piper.role === "worker");
 
-    // Also show skills from tasks that aren't registered as Piper skills yet
+    // Unregistered skills from tasks
     const registeredNames = new Set(piperSkills.map((s) => s.name));
     const taskSkills = new Map<string, number>();
     for (const t of tasks) {
@@ -428,58 +428,82 @@ export class PiperApp extends LitElement {
     }
 
     if (piperSkillsLoading) {
-      return html`<p style="color:var(--text-muted)">Loading skills...</p>`;
+      return html`<p style="color:var(--text-muted)">Loading...</p>`;
     }
 
-    const skillCard = (s: typeof piperSkills[0]) => html`
-      <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px">
-        <span style="font-size:20px">${s.emoji ?? (s.piper.role === "manager" ? "👔" : "⚡")}</span>
+    if (piperSkills.length === 0 && taskSkills.size === 0) {
+      return html`
+        <h2 style="font-size:18px;font-weight:700;margin-bottom:20px">Hierarchy</h2>
+        <div style="text-align:center;padding:40px;color:var(--text-muted)">
+          <p style="font-size:14px;margin-bottom:8px">No Piper skills registered yet.</p>
+          <p style="font-size:12px">Add <code>piper</code> metadata to your SKILL.md frontmatter.</p>
+        </div>
+      `;
+    }
+
+    // Styles
+    const nodeBase = "background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px";
+    const managerBorder = "border-left:3px solid #3b82f6";
+    const workerBorder = "border-left:3px solid #22c55e";
+    const unregBorder = "border-left:3px solid #f59e0b";
+    const badge = (text: string, bg: string, fg: string) =>
+      html`<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${bg};color:${fg};font-weight:600;text-transform:uppercase;letter-spacing:0.5px">${text}</span>`;
+    const connector = "width:2px;background:var(--border);margin-left:28px";
+    const branch = "display:flex;align-items:stretch;gap:0";
+
+    const workerNode = (s: typeof piperSkills[0]) => html`
+      <div style="${nodeBase};${workerBorder}">
+        <span style="font-size:18px">${s.emoji ?? "⚡"}</span>
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:13px">${s.name}</div>
-          <div style="font-size:12px;color:var(--text-secondary)">${s.description ?? s.piper.description ?? ""}</div>
+          <div style="font-size:11px;color:var(--text-secondary)">${s.description ?? s.piper.description ?? ""}</div>
         </div>
-        <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:${s.piper.role === "manager" ? "#3b82f620" : "#22c55e20"};color:${s.piper.role === "manager" ? "#3b82f6" : "#22c55e"};font-weight:600">${s.piper.type ?? s.piper.role}</span>
+        ${badge(s.piper.type ?? "worker", "#22c55e15", "#22c55e")}
+      </div>
+    `;
+
+    const unregNode = (name: string, count: number) => html`
+      <div style="${nodeBase};${unregBorder}">
+        <span style="font-size:18px">❓</span>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:13px">${name}</div>
+          <div style="font-size:11px;color:var(--text-secondary)">${count} task${count > 1 ? "s" : ""} assigned</div>
+        </div>
+        ${badge("unregistered", "#f59e0b15", "#f59e0b")}
       </div>
     `;
 
     return html`
-      <h2 style="font-size:18px;font-weight:700;margin-bottom:20px">Piper Skills</h2>
+      <h2 style="font-size:18px;font-weight:700;margin-bottom:24px">Hierarchy</h2>
 
-      ${managers.length > 0 ? html`
-        <h3 style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin:16px 0 8px">Managers</h3>
-        <div style="display:grid;gap:8px;margin-bottom:24px">
-          ${managers.map(skillCard)}
+      ${managers.map((mgr) => html`
+        <!-- Manager node -->
+        <div style="${nodeBase};${managerBorder};margin-bottom:4px">
+          <span style="font-size:22px">${mgr.emoji ?? "👔"}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:14px">${mgr.name}</div>
+            <div style="font-size:11px;color:var(--text-secondary)">${mgr.description ?? mgr.piper.description ?? ""}</div>
+          </div>
+          ${badge(mgr.piper.type ?? "manager", "#3b82f615", "#3b82f6")}
         </div>
-      ` : nothing}
 
-      ${workers.length > 0 ? html`
-        <h3 style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin:16px 0 8px">Workers</h3>
-        <div style="display:grid;gap:8px;margin-bottom:24px">
-          ${workers.map(skillCard)}
+        <!-- Connector + Workers -->
+        <div style="margin-left:28px;border-left:2px solid var(--border);padding-left:20px;margin-bottom:24px">
+          <div style="display:grid;gap:6px;padding-top:6px">
+            ${workers.map((w) => workerNode(w))}
+            ${[...taskSkills.entries()].map(([name, count]) => unregNode(name, count))}
+          </div>
         </div>
-      ` : nothing}
+      `)}
 
-      ${piperSkills.length === 0 && taskSkills.size === 0 ? html`
-        <div style="text-align:center;padding:40px;color:var(--text-muted)">
-          <p style="font-size:14px;margin-bottom:8px">No Piper skills registered yet.</p>
-          <p style="font-size:12px">Create a skill with <code>piper</code> metadata in your SKILL.md:</p>
-          <pre style="text-align:left;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;font-size:12px;color:var(--text-secondary)">metadata: { "openclaw": { "piper": { "role": "worker", "type": "researcher" } } }</pre>
+      ${managers.length === 0 ? html`
+        <!-- No manager — show workers as standalone -->
+        <div style="padding:8px 0 8px 0;margin-bottom:8px">
+          <span style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600">Available Workers</span>
         </div>
-      ` : nothing}
-
-      ${taskSkills.size > 0 ? html`
-        <h3 style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin:16px 0 8px">Unregistered (from tasks)</h3>
-        <div style="display:grid;gap:8px">
-          ${[...taskSkills.entries()].map(([name, count]) => html`
-            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px">
-              <span style="font-size:20px">❓</span>
-              <div style="flex:1">
-                <div style="font-weight:600;font-size:13px">${name}</div>
-                <div style="font-size:12px;color:var(--text-secondary)">${count} task${count > 1 ? "s" : ""} assigned</div>
-              </div>
-              <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#f59e0b20;color:#f59e0b;font-weight:600">unregistered</span>
-            </div>
-          `)}
+        <div style="display:grid;gap:6px;margin-bottom:24px">
+          ${workers.map((w) => workerNode(w))}
+          ${[...taskSkills.entries()].map(([name, count]) => unregNode(name, count))}
         </div>
       ` : nothing}
     `;
