@@ -1,3 +1,5 @@
+import { TASK_READ_METHODS, TASK_WRITE_METHODS } from "../tasks/gateway-registration.js";
+
 export const ADMIN_SCOPE = "operator.admin" as const;
 export const READ_SCOPE = "operator.read" as const;
 export const WRITE_SCOPE = "operator.write" as const;
@@ -90,15 +92,7 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "talk.config",
     "agents.files.list",
     "agents.files.get",
-    "tasks.objectives.list",
-    "tasks.objectives.get",
-    "tasks.list",
-    "tasks.get",
-    "tasks.reports.list",
-    "tasks.reports.get",
-    "tasks.steps.list",
-    "tasks.audit.list",
-    "tasks.skills.list",
+    ...TASK_READ_METHODS,
   ],
   [WRITE_SCOPE]: [
     "send",
@@ -123,9 +117,7 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "browser.request",
     "push.test",
     "node.pending.enqueue",
-    "tasks.approve",
-    "tasks.reject",
-    "tasks.events.emit",
+    ...TASK_WRITE_METHODS,
   ],
   [ADMIN_SCOPE]: [
     "channels.logout",

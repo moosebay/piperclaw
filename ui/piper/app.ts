@@ -1,10 +1,6 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import {
-  GatewayBrowserClient,
-  type GatewayHelloOk,
-} from "../src/ui/gateway.ts";
-import {
   type TasksState,
   DEFAULT_TASKS_STATE,
   loadObjectives,
@@ -16,9 +12,10 @@ import {
   rejectTask,
   cancelObjective,
 } from "../src/ui/controllers/tasks.ts";
+import { GatewayBrowserClient, type GatewayHelloOk } from "../src/ui/gateway.ts";
+import { renderAudit } from "../src/ui/views/audit.ts";
 import { renderObjectives } from "../src/ui/views/objectives.ts";
 import { renderTasksKanban } from "../src/ui/views/tasks-kanban.ts";
-import { renderAudit } from "../src/ui/views/audit.ts";
 
 type PiperTab = "objectives" | "tasks" | "audit" | "skills";
 
@@ -55,7 +52,11 @@ export class PiperApp extends LitElement {
       line-height: 1.5;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     .sidebar {
       width: var(--sidebar-width);
@@ -74,7 +75,9 @@ export class PiperApp extends LitElement {
       letter-spacing: -0.5px;
       color: var(--text);
     }
-    .sidebar-brand span { color: var(--accent); }
+    .sidebar-brand span {
+      color: var(--accent);
+    }
 
     .sidebar-section {
       padding: 0 12px;
@@ -100,14 +103,26 @@ export class PiperApp extends LitElement {
       text-decoration: none;
       font-size: 13px;
       font-weight: 500;
-      transition: background 0.1s, color 0.1s;
+      transition:
+        background 0.1s,
+        color 0.1s;
     }
-    .sidebar-item:hover { background: var(--bg-hover); color: var(--text); }
-    .sidebar-item[data-active] { background: var(--accent); color: #fff; }
+    .sidebar-item:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+    .sidebar-item[data-active] {
+      background: var(--accent);
+      color: #fff;
+    }
     .sidebar-item svg {
-      width: 16px; height: 16px;
-      stroke: currentColor; fill: none;
-      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
 
     .sidebar-footer {
@@ -123,11 +138,14 @@ export class PiperApp extends LitElement {
       color: var(--text-muted);
     }
     .status-dot {
-      width: 8px; height: 8px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       background: #ef4444;
     }
-    .status-dot[data-ok] { background: #22c55e; }
+    .status-dot[data-ok] {
+      background: #22c55e;
+    }
 
     .main {
       flex: 1;
@@ -151,8 +169,15 @@ export class PiperApp extends LitElement {
       text-align: center;
       max-width: 400px;
     }
-    .connect-box h2 { margin-bottom: 8px; font-size: 20px; }
-    .connect-box p { color: var(--text-secondary); margin-bottom: 20px; font-size: 13px; }
+    .connect-box h2 {
+      margin-bottom: 8px;
+      font-size: 20px;
+    }
+    .connect-box p {
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
     .connect-box input {
       width: 100%;
       padding: 10px 12px;
@@ -164,7 +189,9 @@ export class PiperApp extends LitElement {
       margin-bottom: 12px;
       outline: none;
     }
-    .connect-box input:focus { border-color: var(--accent); }
+    .connect-box input:focus {
+      border-color: var(--accent);
+    }
     .connect-box button {
       width: 100%;
       padding: 10px;
@@ -176,9 +203,18 @@ export class PiperApp extends LitElement {
       font-weight: 600;
       cursor: pointer;
     }
-    .connect-box button:hover { background: var(--accent-hover); }
-    .connect-box button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .error-text { color: #ef4444; font-size: 12px; margin-top: 8px; }
+    .connect-box button:hover {
+      background: var(--accent-hover);
+    }
+    .connect-box button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .error-text {
+      color: #ef4444;
+      font-size: 12px;
+      margin-top: 8px;
+    }
   `;
 
   connectedCallback() {
@@ -226,7 +262,9 @@ export class PiperApp extends LitElement {
   }
 
   private async refresh() {
-    if (!this.client) return;
+    if (!this.client) {
+      return;
+    }
     const s = { ...this.tasksState };
     await Promise.all([
       loadObjectives(this.client, s),
@@ -238,7 +276,9 @@ export class PiperApp extends LitElement {
   }
 
   private async refreshObjectives() {
-    if (!this.client) return;
+    if (!this.client) {
+      return;
+    }
     const s = { ...this.tasksState };
     await loadObjectives(this.client, s);
     this.tasksState = { ...s };
@@ -420,15 +460,25 @@ export class PiperApp extends LitElement {
     const workerMap = new Map(workers.map((w) => [w.name, w]));
 
     if (piperSkillsLoading) {
-      return html`<p style="color:var(--text-muted)">Loading...</p>`;
+      return html`
+        <p style="color: var(--text-muted)">Loading...</p>
+      `;
     }
 
     if (piperSkills.length === 0) {
       return html`
-        <div style="display:flex;flex-direction:column;align-items:center;padding:60px 20px;color:var(--text-muted)">
-          <div style="font-size:36px;margin-bottom:12px">⚡</div>
-          <p style="font-size:15px;margin-bottom:6px">No Piper skills registered yet.</p>
-          <p style="font-size:12px">Say <em>"Create a piper team for..."</em> in chat to get started.</p>
+        <div
+          style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+          "
+        >
+          <div style="font-size: 36px; margin-bottom: 12px">⚡</div>
+          <p style="font-size: 15px; margin-bottom: 6px">No Piper skills registered yet.</p>
+          <p style="font-size: 12px">Say <em>"Create a piper team for..."</em> in chat to get started.</p>
         </div>
       `;
     }
@@ -459,14 +509,20 @@ export class PiperApp extends LitElement {
         </div>
 
         <!-- Vertical line from header to managers row -->
-        ${managers.length > 0 ? html`
+        ${
+          managers.length > 0
+            ? html`
           <div style="display:flex;justify-content:center">
             <div style="width:2px;height:24px;background:${lineColor}"></div>
           </div>
-        ` : nothing}
+        `
+            : nothing
+        }
 
         <!-- Managers + Workers org chart -->
-        ${managers.length > 0 ? html`
+        ${
+          managers.length > 0
+            ? html`
           <!-- Vertical stem from Piper to manager row -->
           <div style="display:flex;justify-content:center">
             <div style="width:2px;height:20px;background:${lineColor}"></div>
@@ -476,7 +532,9 @@ export class PiperApp extends LitElement {
           <div style="display:flex;justify-content:center;align-items:flex-start">
             ${managers.map((mgr, mgrIdx) => {
               const mgrWorkerNames = mgr.piper.workers ?? [];
-              const mgrWorkers = mgrWorkerNames.map((n) => workerMap.get(n)).filter(Boolean) as typeof workers;
+              const mgrWorkers = mgrWorkerNames
+                .map((n) => workerMap.get(n))
+                .filter(Boolean) as typeof workers;
               const isFirst = mgrIdx === 0;
               const isLast = mgrIdx === managers.length - 1;
               const isOnly = managers.length === 1;
@@ -487,12 +545,16 @@ export class PiperApp extends LitElement {
                   <div style="position:relative;width:calc(100% + 60px);margin:0 -30px;height:20px">
                     <!-- Vertical drop from center -->
                     <div style="position:absolute;left:50%;top:0;width:2px;height:100%;background:${lineColor};transform:translateX(-50%)"></div>
-                    ${!isOnly ? html`
+                    ${
+                      !isOnly
+                        ? html`
                       <!-- Horizontal half: left side (except first manager) -->
                       ${!isFirst ? html`<div style="position:absolute;top:0;left:0;right:50%;height:2px;background:${lineColor}"></div>` : nothing}
                       <!-- Horizontal half: right side (except last manager) -->
                       ${!isLast ? html`<div style="position:absolute;top:0;left:50%;right:0;height:2px;background:${lineColor}"></div>` : nothing}
-                    ` : nothing}
+                    `
+                        : nothing
+                    }
                   </div>
 
                   <!-- Manager node -->
@@ -505,7 +567,9 @@ export class PiperApp extends LitElement {
                   </div>
 
                   <!-- Workers under this manager -->
-                  ${mgrWorkers.length > 0 ? html`
+                  ${
+                    mgrWorkers.length > 0
+                      ? html`
                     <!-- Vertical stem -->
                     <div style="width:2px;height:24px;background:${lineColor}"></div>
 
@@ -520,10 +584,14 @@ export class PiperApp extends LitElement {
                             <!-- Worker top connector -->
                             <div style="position:relative;width:100%;height:18px">
                               <div style="position:absolute;left:50%;top:0;width:2px;height:100%;background:${lineColor};transform:translateX(-50%)"></div>
-                              ${!wOnly ? html`
+                              ${
+                                !wOnly
+                                  ? html`
                                 ${!wFirst ? html`<div style="position:absolute;top:0;left:0;right:50%;height:2px;background:${lineColor}"></div>` : nothing}
                                 ${!wLast ? html`<div style="position:absolute;top:0;left:50%;right:0;height:2px;background:${lineColor}"></div>` : nothing}
-                              ` : nothing}
+                              `
+                                  : nothing
+                              }
                             </div>
 
                             <!-- Worker node -->
@@ -536,38 +604,50 @@ export class PiperApp extends LitElement {
                             </div>
 
                             <!-- Capability tags -->
-                            ${(w.piper.capabilities ?? []).length > 0 ? html`
+                            ${
+                              (w.piper.capabilities ?? []).length > 0
+                                ? html`
                               <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:170px">
                                 ${(w.piper.capabilities ?? []).map((c) => capTag(c))}
                               </div>
-                            ` : nothing}
+                            `
+                                : nothing
+                            }
                           </div>
                         `;
                       })}
                     </div>
-                  ` : nothing}
+                  `
+                      : nothing
+                  }
                 </div>
               `;
             })}
           </div>
-        ` : nothing}
+        `
+            : nothing
+        }
 
         ${(() => {
           const allMgrWorkers = new Set(managers.flatMap((m) => m.piper.workers ?? []));
           const unassigned = workers.filter((w) => !allMgrWorkers.has(w.name));
-          if (unassigned.length === 0) return nothing;
+          if (unassigned.length === 0) {
+            return nothing;
+          }
           return html`
             <div style="margin-top:40px;text-align:center">
               <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Unassigned Workers</div>
               <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center">
-                ${unassigned.map((w) => html`
+                ${unassigned.map(
+                  (w) => html`
                   <div style="
                     background:${nodeBg};border:1px solid var(--border);border-radius:8px;
                     padding:10px 16px;text-align:center;min-width:120px;opacity:0.6;
                   ">
                     <div style="font-weight:600;font-size:13px;color:var(--text)">${w.piper.type ?? w.name}</div>
                   </div>
-                `)}
+                `,
+                )}
               </div>
             </div>
           `;

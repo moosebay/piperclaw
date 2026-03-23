@@ -28,10 +28,14 @@ const ACTION_COLORS: Record<string, string> = {
 
 function actionColor(action: string): string {
   // Check for exact match first, then try partial match
-  if (ACTION_COLORS[action]) return ACTION_COLORS[action];
+  if (ACTION_COLORS[action]) {
+    return ACTION_COLORS[action];
+  }
   const lower = action.toLowerCase();
   for (const [key, color] of Object.entries(ACTION_COLORS)) {
-    if (lower.includes(key)) return color;
+    if (lower.includes(key)) {
+      return color;
+    }
   }
   return "#6b7280";
 }
@@ -60,7 +64,9 @@ function formatTimestamp(ts: number): string {
 }
 
 function matchesFilter(entry: AuditEntry, filter: string): boolean {
-  if (!filter) return true;
+  if (!filter) {
+    return true;
+  }
   const lower = filter.toLowerCase();
   return (
     entry.action.toLowerCase().includes(lower) ||
@@ -78,19 +84,21 @@ function matchesFilter(entry: AuditEntry, filter: string): boolean {
 // ---------------------------------------------------------------------------
 
 function renderTransition(from?: string, to?: string) {
-  if (!from && !to) return nothing;
+  if (!from && !to) {
+    return nothing;
+  }
 
   return html`
     <span style="display:inline-flex;align-items:center;gap:4px;font-size:12px">
-      ${from
-        ? html`<span style="color:var(--muted)">${from}</span>`
-        : nothing}
-      ${from && to
-        ? html`<span style="color:var(--muted)">&rarr;</span>`
-        : nothing}
-      ${to
-        ? html`<span style="color:var(--text)">${to}</span>`
-        : nothing}
+      ${from ? html`<span style="color:var(--muted)">${from}</span>` : nothing}
+      ${
+        from && to
+          ? html`
+              <span style="color: var(--muted)">&rarr;</span>
+            `
+          : nothing
+      }
+      ${to ? html`<span style="color:var(--text)">${to}</span>` : nothing}
     </span>
   `;
 }
@@ -149,7 +157,12 @@ function renderAuditRow(entry: AuditEntry) {
         ${renderTransition(entry.fromStatus, entry.toStatus)}
       </td>
       <td style="padding:8px 12px;font-size:12px;color:var(--text)">
-        ${entry.actor ?? html`<span style="color:var(--muted)">system</span>`}
+        ${
+          entry.actor ??
+          html`
+            <span style="color: var(--muted)">system</span>
+          `
+        }
       </td>
       <td
         style="
@@ -202,28 +215,30 @@ export function renderAudit(props: AuditProps) {
             type="text"
             placeholder="Search actions, entities, actors..."
             .value=${state.auditFilter}
-            @input=${(e: Event) =>
-              onFilterChange((e.target as HTMLInputElement).value)}
+            @input=${(e: Event) => onFilterChange((e.target as HTMLInputElement).value)}
           />
         </label>
         <div style="font-size:12px;color:var(--muted)">
-          ${sorted.length}${sorted.length !== state.auditLog.length
-            ? html` of ${state.auditLog.length}`
-            : nothing}
+          ${sorted.length}${
+            sorted.length !== state.auditLog.length ? html` of ${state.auditLog.length}` : nothing
+          }
           entries
         </div>
       </div>
 
-      ${sorted.length === 0 && !state.auditLoading
-        ? html`
+      ${
+        sorted.length === 0 && !state.auditLoading
+          ? html`
             <div class="muted" style="padding:24px 0;text-align:center">
               ${state.auditFilter ? "No matching entries." : "No audit entries found."}
             </div>
           `
-        : nothing}
+          : nothing
+      }
 
-      ${sorted.length > 0
-        ? html`
+      ${
+        sorted.length > 0
+          ? html`
             <div
               style="
                 overflow-x:auto;
@@ -326,7 +341,8 @@ export function renderAudit(props: AuditProps) {
               </table>
             </div>
           `
-        : nothing}
+          : nothing
+      }
     </section>
   `;
 }

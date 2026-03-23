@@ -1,6 +1,6 @@
 import { html, nothing } from "lit";
-import { formatRelativeTimestamp } from "../format.ts";
 import type { TaskObjective, TaskItem, TasksState } from "../controllers/tasks.ts";
+import { formatRelativeTimestamp } from "../format.ts";
 
 export type ObjectivesProps = {
   state: TasksState;
@@ -130,7 +130,9 @@ function renderTaskTree(tasks: TaskItem[], objectiveId: string) {
     .toSorted((a, b) => a.priority - b.priority || a.createdAt - b.createdAt);
 
   if (objTasks.length === 0) {
-    return html`<div class="muted" style="margin-top:10px;font-size:13px">No tasks yet.</div>`;
+    return html`
+      <div class="muted" style="margin-top: 10px; font-size: 13px">No tasks yet.</div>
+    `;
   }
 
   // Group by group field (undefined groups go under "Ungrouped")
@@ -149,10 +151,11 @@ function renderTaskTree(tasks: TaskItem[], objectiveId: string) {
 
   return html`
     <div style="margin-top:10px">
-      ${singleGroup
-        ? renderTaskList(objTasks)
-        : html`${Array.from(groups.entries()).map(
-            ([groupName, groupTasks]) => html`
+      ${
+        singleGroup
+          ? renderTaskList(objTasks)
+          : html`${Array.from(groups.entries()).map(
+              ([groupName, groupTasks]) => html`
               <div style="margin-top:8px">
                 <div
                   style="
@@ -169,7 +172,8 @@ function renderTaskTree(tasks: TaskItem[], objectiveId: string) {
                 ${renderTaskList(groupTasks)}
               </div>
             `,
-          )}`}
+            )}`
+      }
     </div>
   `;
 }
@@ -213,9 +217,7 @@ function renderTaskList(tasks: TaskItem[]) {
               <div style="font-size:11px;color:var(--muted);margin-top:2px">
                 ${statusLabel(task.status)}
                 ${task.assignedSkill ? html` · ${task.assignedSkill}` : nothing}
-                ${task.error
-                  ? html` · <span style="color:#ef4444">${task.error}</span>`
-                  : nothing}
+                ${task.error ? html` · <span style="color:#ef4444">${task.error}</span>` : nothing}
               </div>
             </div>
             <div style="font-size:11px;color:var(--muted);flex-shrink:0">
@@ -271,8 +273,9 @@ function renderObjectiveCard(
           </div>
         </div>
         <div class="row" style="gap:6px;flex-shrink:0" @click=${(e: Event) => e.stopPropagation()}>
-          ${active
-            ? html`
+          ${
+            active
+              ? html`
                 <button
                   class="btn danger"
                   style="font-size:12px;padding:4px 10px"
@@ -281,7 +284,8 @@ function renderObjectiveCard(
                   Cancel
                 </button>
               `
-            : nothing}
+              : nothing
+          }
           <span
             style="
               font-size:18px;
@@ -324,17 +328,21 @@ export function renderObjectives(props: ObjectivesProps) {
         </button>
       </div>
 
-      ${state.objectivesError
-        ? html`<div class="callout danger" style="margin-bottom:14px">
+      ${
+        state.objectivesError
+          ? html`<div class="callout danger" style="margin-bottom:14px">
             ${state.objectivesError}
           </div>`
-        : nothing}
+          : nothing
+      }
 
-      ${state.objectives.length === 0 && !state.objectivesLoading
-        ? html`<div class="muted" style="padding:24px 0;text-align:center">
-            No objectives found.
-          </div>`
-        : nothing}
+      ${
+        state.objectives.length === 0 && !state.objectivesLoading
+          ? html`
+              <div class="muted" style="padding: 24px 0; text-align: center">No objectives found.</div>
+            `
+          : nothing
+      }
 
       <div class="stack" style="gap:14px">
         ${state.objectives.map((obj) =>

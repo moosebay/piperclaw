@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { OpenClawConfig } from "../../config/config.js";
 import { isTruthyEnvValue } from "../../infra/env.js";
+import { getTaskSubclis } from "../../tasks/cli-registration.js";
 import { getPrimaryCommand, hasHelpOrVersion } from "../argv.js";
 import { reparseProgramFromActionArgs } from "./action-reparse.js";
 import { removeCommand, removeCommandByName } from "./command-tree.js";
@@ -163,33 +164,8 @@ const entries: SubCliEntry[] = [
       mod.registerCronCli(program);
     },
   },
-  {
-    name: "objectives",
-    description: "Manage task-system objectives",
-    hasSubcommands: true,
-    register: async (program) => {
-      const mod = await import("../tasks-cli.js");
-      mod.registerTasksCli(program);
-    },
-  },
-  {
-    name: "tasks",
-    description: "Manage task-system tasks",
-    hasSubcommands: true,
-    register: async (program) => {
-      const mod = await import("../tasks-cli.js");
-      mod.registerTasksCli(program);
-    },
-  },
-  {
-    name: "reports",
-    description: "Manage task-system reports",
-    hasSubcommands: true,
-    register: async (program) => {
-      const mod = await import("../tasks-cli.js");
-      mod.registerTasksCli(program);
-    },
-  },
+  // Task system CLIs — registration data lives in src/tasks/cli-registration.ts
+  ...getTaskSubclis(),
   {
     name: "dns",
     description: "DNS helpers for wide-area discovery (Tailscale + CoreDNS)",

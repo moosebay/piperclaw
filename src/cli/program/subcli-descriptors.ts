@@ -1,3 +1,5 @@
+import { TASK_SUBCLI_DESCRIPTORS } from "../../tasks/cli-registration.js";
+
 export type SubCliDescriptor = {
   name: string;
   description: string;
@@ -133,7 +135,8 @@ export const SUB_CLI_DESCRIPTORS = [
     description: "Generate shell completion script",
     hasSubcommands: false,
   },
-] as const satisfies ReadonlyArray<SubCliDescriptor>;
+  ...TASK_SUBCLI_DESCRIPTORS,
+] satisfies ReadonlyArray<SubCliDescriptor>;
 
 export function getSubCliEntries(): ReadonlyArray<SubCliDescriptor> {
   return SUB_CLI_DESCRIPTORS;

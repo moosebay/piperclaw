@@ -1,6 +1,6 @@
 import { html, nothing } from "lit";
-import { formatRelativeTimestamp } from "../format.ts";
 import type { TaskItem, TasksState, TaskDetail } from "../controllers/tasks.ts";
+import { formatRelativeTimestamp } from "../format.ts";
 
 export type TasksKanbanProps = {
   state: TasksState;
@@ -88,13 +88,10 @@ function renderFilters(props: TasksKanbanProps) {
         <span style="font-size:11px">Status</span>
         <select
           .value=${props.state.taskStatusFilter}
-          @change=${(e: Event) =>
-            props.onStatusFilter((e.target as HTMLSelectElement).value)}
+          @change=${(e: Event) => props.onStatusFilter((e.target as HTMLSelectElement).value)}
         >
           <option value="all">All statuses</option>
-          ${COLUMNS.map(
-            (col) => html`<option value=${col.key}>${col.label}</option>`,
-          )}
+          ${COLUMNS.map((col) => html`<option value=${col.key}>${col.label}</option>`)}
           <option value="cancelled">Cancelled</option>
         </select>
       </label>
@@ -103,18 +100,16 @@ function renderFilters(props: TasksKanbanProps) {
         <span style="font-size:11px">Skill</span>
         <select
           .value=${props.state.taskSkillFilter}
-          @change=${(e: Event) =>
-            props.onSkillFilter((e.target as HTMLSelectElement).value)}
+          @change=${(e: Event) => props.onSkillFilter((e.target as HTMLSelectElement).value)}
         >
           <option value="all">All skills</option>
-          ${skills.map(
-            (skill) => html`<option value=${skill}>${skill}</option>`,
-          )}
+          ${skills.map((skill) => html`<option value=${skill}>${skill}</option>`)}
         </select>
       </label>
 
-      ${objectiveIds.length > 1
-        ? html`
+      ${
+        objectiveIds.length > 1
+          ? html`
             <label class="field" style="min-width:130px">
               <span style="font-size:11px">Objective</span>
               <select
@@ -125,13 +120,12 @@ function renderFilters(props: TasksKanbanProps) {
                 }}
               >
                 <option value="">All objectives</option>
-                ${objectiveIds.map(
-                  (id) => html`<option value=${id}>${id.slice(0, 8)}...</option>`,
-                )}
+                ${objectiveIds.map((id) => html`<option value=${id}>${id.slice(0, 8)}...</option>`)}
               </select>
             </label>
           `
-        : nothing}
+          : nothing
+      }
 
       <button
         class="btn"
@@ -148,11 +142,7 @@ function renderFilters(props: TasksKanbanProps) {
 // Kanban card
 // ---------------------------------------------------------------------------
 
-function renderTaskCard(
-  task: TaskItem,
-  selected: boolean,
-  onSelect: (id: string) => void,
-) {
+function renderTaskCard(task: TaskItem, selected: boolean, onSelect: (id: string) => void) {
   return html`
     <div
       class="list-item${selected ? " list-item-selected" : ""} list-item-clickable"
@@ -177,8 +167,9 @@ function renderTaskCard(
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 10px">
         <span>${formatRelativeTimestamp(task.updatedAt)}</span>
-        ${task.assignedSkill
-          ? html`
+        ${
+          task.assignedSkill
+            ? html`
               <span
                 style="
                   background:var(--bg-muted);
@@ -190,10 +181,12 @@ function renderTaskCard(
                 ${task.assignedSkill}
               </span>
             `
-          : nothing}
+            : nothing
+        }
       </div>
-      ${task.error
-        ? html`
+      ${
+        task.error
+          ? html`
             <div
               style="
                 font-size:11px;
@@ -207,7 +200,8 @@ function renderTaskCard(
               ${task.error}
             </div>
           `
-        : nothing}
+          : nothing
+      }
     </div>
   `;
 }
@@ -273,15 +267,15 @@ function renderColumn(
           max-height:520px;
         "
       >
-        ${tasks.length === 0
-          ? html`
-              <div style="text-align:center;color:var(--muted);font-size:12px;padding:16px 0">
-                No tasks
-              </div>
-            `
-          : tasks.map((task) =>
-              renderTaskCard(task, task.id === selectedTaskId, onSelect),
-            )}
+        ${
+          tasks.length === 0
+            ? html`
+                <div style="text-align: center; color: var(--muted); font-size: 12px; padding: 16px 0">
+                  No tasks
+                </div>
+              `
+            : tasks.map((task) => renderTaskCard(task, task.id === selectedTaskId, onSelect))
+        }
       </div>
     </div>
   `;
@@ -305,12 +299,11 @@ function renderDetailPanel(
       <div class="row" style="justify-content:space-between;align-items:flex-start">
         <div style="flex:1;min-width:0">
           <div class="card-title">${task.title}</div>
-          ${task.description
-            ? html`<div class="card-sub">${task.description}</div>`
-            : nothing}
+          ${task.description ? html`<div class="card-sub">${task.description}</div>` : nothing}
         </div>
-        ${isWaiting
-          ? html`
+        ${
+          isWaiting
+            ? html`
               <div class="row" style="gap:6px;flex-shrink:0">
                 <button
                   class="btn primary"
@@ -328,7 +321,8 @@ function renderDetailPanel(
                 </button>
               </div>
             `
-          : nothing}
+            : nothing
+        }
       </div>
 
       <div
@@ -366,8 +360,9 @@ function renderDetailPanel(
         </div>
       </div>
 
-      ${task.dependsOn && task.dependsOn.length > 0
-        ? html`
+      ${
+        task.dependsOn && task.dependsOn.length > 0
+          ? html`
             <div style="margin-top:12px">
               <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Dependencies</div>
               <div style="display:flex;flex-wrap:wrap;gap:4px">
@@ -390,18 +385,22 @@ function renderDetailPanel(
               </div>
             </div>
           `
-        : nothing}
+          : nothing
+      }
 
-      ${task.error
-        ? html`
+      ${
+        task.error
+          ? html`
             <div class="callout danger" style="margin-top:12px;font-size:12px">
               ${task.error}
             </div>
           `
-        : nothing}
+          : nothing
+      }
 
-      ${waitCondition
-        ? html`
+      ${
+        waitCondition
+          ? html`
             <div
               style="
                 margin-top:12px;
@@ -414,23 +413,30 @@ function renderDetailPanel(
             >
               <div style="color:#8b5cf6;font-weight:600;margin-bottom:4px">Waiting for event</div>
               <div style="color:var(--text)">${waitCondition.eventName}</div>
-              ${waitCondition.timeoutAt
-                ? html`
+              ${
+                waitCondition.timeoutAt
+                  ? html`
                     <div style="color:var(--muted);margin-top:2px">
                       Timeout: ${new Date(waitCondition.timeoutAt).toLocaleString()}
                     </div>
                   `
-                : nothing}
+                  : nothing
+              }
             </div>
           `
-        : nothing}
+          : nothing
+      }
 
       ${renderSteps(steps)}
       ${renderReportSummary(report)}
 
-      ${loading
-        ? html`<div class="muted" style="margin-top:12px;font-size:12px">Loading details...</div>`
-        : nothing}
+      ${
+        loading
+          ? html`
+              <div class="muted" style="margin-top: 12px; font-size: 12px">Loading details...</div>
+            `
+          : nothing
+      }
     </div>
   `;
 }
@@ -470,9 +476,15 @@ function renderSteps(steps: TaskDetail["steps"]) {
 }
 
 function stepStatusColor(status: string): string {
-  if (status === "completed" || status === "done") return "#22c55e";
-  if (status === "running" || status === "in_progress") return "#f59e0b";
-  if (status === "failed" || status === "error") return "#ef4444";
+  if (status === "completed" || status === "done") {
+    return "#22c55e";
+  }
+  if (status === "running" || status === "in_progress") {
+    return "#f59e0b";
+  }
+  if (status === "failed" || status === "error") {
+    return "#ef4444";
+  }
   return "#6b7280";
 }
 
@@ -528,9 +540,11 @@ export function renderTasksKanban(props: TasksKanbanProps) {
 
       ${renderFilters(props)}
 
-      ${state.tasksError
-        ? html`<div class="callout danger" style="margin-bottom:14px">${state.tasksError}</div>`
-        : nothing}
+      ${
+        state.tasksError
+          ? html`<div class="callout danger" style="margin-bottom:14px">${state.tasksError}</div>`
+          : nothing
+      }
 
       <div
         style="
@@ -541,18 +555,15 @@ export function renderTasksKanban(props: TasksKanbanProps) {
         "
       >
         ${visibleColumns.map((col) =>
-          renderColumn(
-            col,
-            tasksForColumn(filtered, col.key),
-            state.selectedTaskId,
-            onSelectTask,
-          ),
+          renderColumn(col, tasksForColumn(filtered, col.key), state.selectedTaskId, onSelectTask),
         )}
       </div>
 
-      ${state.taskDetail && state.selectedTaskId
-        ? renderDetailPanel(state.taskDetail, state.taskDetailLoading, onApprove, onReject)
-        : nothing}
+      ${
+        state.taskDetail && state.selectedTaskId
+          ? renderDetailPanel(state.taskDetail, state.taskDetailLoading, onApprove, onReject)
+          : nothing
+      }
     </section>
   `;
 }

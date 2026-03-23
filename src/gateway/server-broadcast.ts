@@ -1,3 +1,4 @@
+import { TASK_EVENT_SCOPE_GUARDS } from "../tasks/gateway-registration.js";
 import {
   ADMIN_SCOPE,
   APPROVALS_SCOPE,
@@ -19,8 +20,7 @@ const EVENT_SCOPE_GUARDS: Record<string, string[]> = {
   "sessions.changed": [READ_SCOPE],
   "session.message": [READ_SCOPE],
   "session.tool": [READ_SCOPE],
-  "task.status": [READ_SCOPE],
-  "objective.progress": [READ_SCOPE],
+  ...TASK_EVENT_SCOPE_GUARDS,
 };
 
 export type GatewayBroadcastStateVersion = {

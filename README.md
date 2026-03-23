@@ -30,7 +30,7 @@ This fork adds **Piper**, a native workflow engine built on top of OpenClaw. Pip
   - **Hierarchy** chart showing manager/worker org structure with capability tags
 - **Gateway RPC** — 12 endpoints for programmatic access (`tasks.list`, `tasks.approve`, `tasks.events.emit`, etc.) + WebSocket broadcast for real-time updates
 - **CLI** — `openclaw objectives`, `openclaw tasks`, `openclaw reports` commands with approve/reject/cancel/audit/import
-- **Piper Skills** — Create manager and worker skills via chat. Just say *"Use piper structure and create a Sales Manager with..."* and the agent creates the skill files with the correct metadata
+- **Piper Skills** — Create manager and worker skills via chat. Just say _"Use piper structure and create a Sales Manager with..."_ and the agent creates the skill files with the correct metadata
 
 ### Piper skill structure
 

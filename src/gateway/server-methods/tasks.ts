@@ -203,9 +203,8 @@ export const tasksHandlers: GatewayRequestHandlers = {
   "tasks.skills.list": async ({ respond }) => {
     try {
       const { loadConfig } = await import("../../config/config.js");
-      const { resolveAgentWorkspaceDir, resolveDefaultAgentId } = await import(
-        "../../agents/agent-scope.js"
-      );
+      const { resolveAgentWorkspaceDir, resolveDefaultAgentId } =
+        await import("../../agents/agent-scope.js");
       const { loadWorkspaceSkillEntries } = await import("../../agents/skills/workspace.js");
 
       const cfg = loadConfig();
@@ -265,9 +264,9 @@ function getStore(respond: RespondFn): import("../../tasks/store.js").TaskStore 
   return store;
 }
 
+import type { PiperSkillMetadata } from "../../agents/skills/types.js";
 // Static import from the runtime boundary (no INEFFECTIVE_DYNAMIC_IMPORT).
 import {
   getTaskStore as _getTaskStore,
   resumeTaskFromEvent as _resumeTaskFromEvent,
 } from "../../tasks/service.runtime.js";
-import type { PiperSkillMetadata } from "../../agents/skills/types.js";

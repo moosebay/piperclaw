@@ -31,6 +31,18 @@ import type { MediaUnderstandingProvider } from "../media-understanding/types.js
 import type { RuntimeEnv } from "../runtime.js";
 import type { RuntimeWebSearchMetadata } from "../secrets/runtime-web-tools.types.js";
 import type {
+  TaskHookName,
+  TaskHookHandlerMap,
+  PluginHookTaskContext,
+  PluginHookTaskReadyEvent,
+  PluginHookTaskCompletedEvent,
+  PluginHookTaskFailedEvent,
+  PluginHookTaskWaitingEvent,
+  PluginHookTaskResumedEvent,
+  PluginHookObjectiveCompletedEvent,
+} from "../tasks/plugin-hooks.js";
+import { TASK_HOOK_NAMES } from "../tasks/plugin-hooks.js";
+import type {
   SpeechProviderConfiguredContext,
   SpeechListVoicesRequest,
   SpeechProviderId,
@@ -1425,12 +1437,7 @@ export type PluginHookName =
   | "subagent_ended"
   | "gateway_start"
   | "gateway_stop"
-  | "task_ready"
-  | "task_completed"
-  | "task_failed"
-  | "task_waiting"
-  | "task_resumed"
-  | "objective_completed";
+  | TaskHookName;
 
 export const PLUGIN_HOOK_NAMES = [
   "before_model_resolve",
@@ -1458,12 +1465,7 @@ export const PLUGIN_HOOK_NAMES = [
   "subagent_ended",
   "gateway_start",
   "gateway_stop",
-  "task_ready",
-  "task_completed",
-  "task_failed",
-  "task_waiting",
-  "task_resumed",
-  "objective_completed",
+  ...TASK_HOOK_NAMES,
 ] as const satisfies readonly PluginHookName[];
 
 type MissingPluginHookNames = Exclude<PluginHookName, (typeof PLUGIN_HOOK_NAMES)[number]>;
@@ -1909,60 +1911,15 @@ export type PluginHookGatewayStopEvent = {
   reason?: string;
 };
 
-// Task context shared across task hooks
-export type PluginHookTaskContext = {
-  agentId: string;
-  objectiveId: string;
-};
-
-// task_ready hook
-export type PluginHookTaskReadyEvent = {
-  taskId: string;
-  title: string;
-  assignedSkill?: string;
-  group?: string;
-};
-
-// task_completed hook
-export type PluginHookTaskCompletedEvent = {
-  taskId: string;
-  title: string;
-  reportId?: string;
-};
-
-// task_failed hook
-export type PluginHookTaskFailedEvent = {
-  taskId: string;
-  title: string;
-  error?: string;
-  retryCount: number;
-  maxRetries: number;
-  retriesExhausted: boolean;
-};
-
-// task_waiting hook — fired when a task suspends to wait for an external event
-export type PluginHookTaskWaitingEvent = {
-  taskId: string;
-  title: string;
-  eventName: string;
-  timeoutAt?: number;
-};
-
-// task_resumed hook — fired when a waiting task is resumed by an event
-export type PluginHookTaskResumedEvent = {
-  taskId: string;
-  title: string;
-  eventName: string;
-  eventData?: unknown;
-};
-
-// objective_completed hook
-export type PluginHookObjectiveCompletedEvent = {
-  objectiveId: string;
-  title: string;
-  completedTasks: number;
-  failedTasks: number;
-  cancelledTasks: number;
+// Task hook types — re-exported from src/tasks/plugin-hooks.ts
+export type {
+  PluginHookTaskContext,
+  PluginHookTaskReadyEvent,
+  PluginHookTaskCompletedEvent,
+  PluginHookTaskFailedEvent,
+  PluginHookTaskWaitingEvent,
+  PluginHookTaskResumedEvent,
+  PluginHookObjectiveCompletedEvent,
 };
 
 // Hook handler types mapped by hook name
@@ -2067,28 +2024,7 @@ export type PluginHookHandlerMap = {
     event: PluginHookGatewayStopEvent,
     ctx: PluginHookGatewayContext,
   ) => Promise<void> | void;
-  task_ready: (event: PluginHookTaskReadyEvent, ctx: PluginHookTaskContext) => Promise<void> | void;
-  task_completed: (
-    event: PluginHookTaskCompletedEvent,
-    ctx: PluginHookTaskContext,
-  ) => Promise<void> | void;
-  task_failed: (
-    event: PluginHookTaskFailedEvent,
-    ctx: PluginHookTaskContext,
-  ) => Promise<void> | void;
-  task_waiting: (
-    event: PluginHookTaskWaitingEvent,
-    ctx: PluginHookTaskContext,
-  ) => Promise<void> | void;
-  task_resumed: (
-    event: PluginHookTaskResumedEvent,
-    ctx: PluginHookTaskContext,
-  ) => Promise<void> | void;
-  objective_completed: (
-    event: PluginHookObjectiveCompletedEvent,
-    ctx: PluginHookTaskContext,
-  ) => Promise<void> | void;
-};
+} & TaskHookHandlerMap;
 
 export type PluginHookRegistration<K extends PluginHookName = PluginHookName> = {
   pluginId: string;

@@ -11,6 +11,7 @@ You help users create Piper skills — managers and workers for the task-driven 
 ## What is Piper?
 
 Piper is a task system where:
+
 - **Managers** create objectives and decompose them into tasks for workers
 - **Workers** execute tasks and produce reports
 - Skills are regular OpenClaw skills with `piper` metadata in their SKILL.md frontmatter
@@ -21,32 +22,62 @@ Piper is a task system where:
 Create a SKILL.md file at `~/.openclaw/workspace/skills/<skill-name>/SKILL.md` with this frontmatter format:
 
 ### Manager skill:
+
 ```yaml
 ---
 name: <skill-name>
 description: <what this manager does>
-metadata: { "openclaw": { "emoji": "<emoji>", "piper": { "role": "manager", "type": "<Display Name>", "description": "<short description>", "workers": ["worker-skill-1", "worker-skill-2"] } } }
+metadata:
+  {
+    "openclaw":
+      {
+        "emoji": "<emoji>",
+        "piper":
+          {
+            "role": "manager",
+            "type": "<Display Name>",
+            "description": "<short description>",
+            "workers": ["worker-skill-1", "worker-skill-2"],
+          },
+      },
+  }
 ---
 ```
 
 ### Worker skill:
+
 ```yaml
 ---
 name: <skill-name>
 description: <what this worker does>
-metadata: { "openclaw": { "emoji": "<emoji>", "piper": { "role": "worker", "type": "<Display Name>", "description": "<short description>", "capabilities": ["Action 1", "Action 2", "Action 3"] } } }
+metadata:
+  {
+    "openclaw":
+      {
+        "emoji": "<emoji>",
+        "piper":
+          {
+            "role": "worker",
+            "type": "<Display Name>",
+            "description": "<short description>",
+            "capabilities": ["Action 1", "Action 2", "Action 3"],
+          },
+      },
+  }
 ---
 ```
 
 ## Piper metadata fields
 
 ### Manager fields:
+
 - `role`: Always `"manager"`
 - `type`: Display name shown on the hierarchy chart (e.g. "Sales Manager")
 - `description`: Short description of what this manager orchestrates
 - `workers`: Array of worker skill names this manager dispatches work to
 
 ### Worker fields:
+
 - `role`: Always `"worker"`
 - `type`: Display name shown on the hierarchy chart (e.g. "LinkedIn Automation")
 - `description`: Short description of what this worker does

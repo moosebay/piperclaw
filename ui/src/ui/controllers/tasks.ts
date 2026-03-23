@@ -238,10 +238,7 @@ export async function loadAuditLog(
   }
 }
 
-export async function approveTask(
-  client: GatewayBrowserClient,
-  taskId: string,
-): Promise<void> {
+export async function approveTask(client: GatewayBrowserClient, taskId: string): Promise<void> {
   await client.request("tasks.approve", { id: taskId });
 }
 
