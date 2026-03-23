@@ -1,14 +1,11 @@
-# 🦞 CoreClaw — OpenClaw Fork with Piper Task System
+# PiperClaw
 
 <p align="center">
-    <picture>
-        <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/openclaw/openclaw/main/docs/assets/openclaw-logo-text-dark.svg">
-        <img src="https://raw.githubusercontent.com/openclaw/openclaw/main/docs/assets/openclaw-logo-text.svg" alt="OpenClaw" width="500">
-    </picture>
+  <strong>Build your AI workforce. Managers, workers, objectives, tasks — all orchestrated.</strong>
 </p>
 
 <p align="center">
-  <strong>OpenClaw + Piper: Task-driven AI workforce with manager/worker hierarchy</strong>
+  <img src="docs/images/piper-hierarchy.jpeg" alt="PiperClaw Hierarchy" width="900">
 </p>
 
 ---
@@ -16,10 +13,6 @@
 ## Piper — Task-Driven Workflow Engine
 
 This fork adds **Piper**, a native workflow engine built on top of OpenClaw. Piper turns your AI assistant into a managed workforce with objectives, tasks, and a manager/worker skill hierarchy.
-
-<p align="center">
-  <img src="docs/images/piper-hierarchy.jpeg" alt="Piper Hierarchy Dashboard" width="900">
-</p>
 
 ### What Piper adds
 
