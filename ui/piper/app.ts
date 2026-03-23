@@ -472,59 +472,83 @@ export class PiperApp extends LitElement {
             <div style="width:2px;height:20px;background:${lineColor}"></div>
           </div>
 
-          <!-- Manager row: horizontal bar auto-sized by flex children -->
-          <div style="display:flex;justify-content:center">
-            <div style="display:inline-flex;align-items:flex-start;gap:0;${managers.length > 1 ? `border-top:2px solid ${lineColor}` : ""}">
-              ${managers.map((mgr) => {
-                const mgrWorkerNames = mgr.piper.workers ?? [];
-                const mgrWorkers = mgrWorkerNames.map((n) => workerMap.get(n)).filter(Boolean) as typeof workers;
+          <!-- All managers side by side -->
+          <div style="display:flex;justify-content:center;gap:60px;align-items:flex-start">
+            ${managers.map((mgr, mgrIdx) => {
+              const mgrWorkerNames = mgr.piper.workers ?? [];
+              const mgrWorkers = mgrWorkerNames.map((n) => workerMap.get(n)).filter(Boolean) as typeof workers;
+              const isFirst = mgrIdx === 0;
+              const isLast = mgrIdx === managers.length - 1;
+              const isOnly = managers.length === 1;
 
-                return html`
-                  <div style="display:flex;flex-direction:column;align-items:center;padding:0 24px">
-                    <!-- Vertical line down to manager -->
-                    <div style="width:2px;height:20px;background:${lineColor}"></div>
-
-                    <!-- Manager node -->
-                    <div style="
-                      background:${nodeBg};border:${nodeBorder};border-radius:8px;
-                      padding:14px 32px;text-align:center;min-width:200px;
-                      box-shadow:0 0 16px ${accentDim};
-                    ">
-                      <div style="font-weight:700;font-size:15px;color:var(--text)">${mgr.piper.type ?? mgr.name}</div>
-                    </div>
-
-                    <!-- Workers under this manager -->
-                    ${mgrWorkers.length > 0 ? html`
-                      <div style="display:flex;flex-direction:column;align-items:center">
-                        <!-- Vertical stem to worker row -->
-                        <div style="width:2px;height:24px;background:${lineColor}"></div>
-
-                        <!-- Worker row: bar auto-sized -->
-                        <div style="display:inline-flex;align-items:flex-start;gap:0;${mgrWorkers.length > 1 ? `border-top:2px solid ${lineColor}` : ""}">
-                          ${mgrWorkers.map((w) => html`
-                            <div style="display:flex;flex-direction:column;align-items:center;padding:0 8px;min-width:160px">
-                              <div style="width:2px;height:18px;background:${lineColor}"></div>
-                              <div style="
-                                background:${nodeBg};border:${nodeBorder};border-radius:8px;
-                                padding:10px 14px;text-align:center;min-width:150px;
-                                box-shadow:0 0 8px ${accentDim};margin-bottom:10px;
-                              ">
-                                <div style="font-weight:600;font-size:13px;color:var(--text)">${w.piper.type ?? w.name}</div>
-                              </div>
-                              ${(w.piper.capabilities ?? []).length > 0 ? html`
-                                <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:170px">
-                                  ${(w.piper.capabilities ?? []).map((c) => capTag(c))}
-                                </div>
-                              ` : nothing}
-                            </div>
-                          `)}
-                        </div>
-                      </div>
+              return html`
+                <div style="display:flex;flex-direction:column;align-items:center">
+                  <!-- Top connector: vertical drop + horizontal half-lines for multi-manager -->
+                  <div style="position:relative;width:100%;height:20px">
+                    <!-- Vertical drop from center -->
+                    <div style="position:absolute;left:50%;top:0;width:2px;height:100%;background:${lineColor};transform:translateX(-50%)"></div>
+                    ${!isOnly ? html`
+                      <!-- Horizontal half: left side (except first manager) -->
+                      ${!isFirst ? html`<div style="position:absolute;top:0;left:0;right:50%;height:2px;background:${lineColor}"></div>` : nothing}
+                      <!-- Horizontal half: right side (except last manager) -->
+                      ${!isLast ? html`<div style="position:absolute;top:0;left:50%;right:0;height:2px;background:${lineColor}"></div>` : nothing}
                     ` : nothing}
                   </div>
-                `;
-              })}
-            </div>
+
+                  <!-- Manager node -->
+                  <div style="
+                    background:${nodeBg};border:${nodeBorder};border-radius:8px;
+                    padding:14px 32px;text-align:center;min-width:200px;
+                    box-shadow:0 0 16px ${accentDim};
+                  ">
+                    <div style="font-weight:700;font-size:15px;color:var(--text)">${mgr.piper.type ?? mgr.name}</div>
+                  </div>
+
+                  <!-- Workers under this manager -->
+                  ${mgrWorkers.length > 0 ? html`
+                    <!-- Vertical stem -->
+                    <div style="width:2px;height:24px;background:${lineColor}"></div>
+
+                    <!-- Workers row -->
+                    <div style="display:flex;align-items:flex-start;gap:0">
+                      ${mgrWorkers.map((w, wIdx) => {
+                        const wFirst = wIdx === 0;
+                        const wLast = wIdx === mgrWorkers.length - 1;
+                        const wOnly = mgrWorkers.length === 1;
+                        return html`
+                          <div style="display:flex;flex-direction:column;align-items:center;min-width:160px;padding:0 8px">
+                            <!-- Worker top connector -->
+                            <div style="position:relative;width:100%;height:18px">
+                              <div style="position:absolute;left:50%;top:0;width:2px;height:100%;background:${lineColor};transform:translateX(-50%)"></div>
+                              ${!wOnly ? html`
+                                ${!wFirst ? html`<div style="position:absolute;top:0;left:0;right:50%;height:2px;background:${lineColor}"></div>` : nothing}
+                                ${!wLast ? html`<div style="position:absolute;top:0;left:50%;right:0;height:2px;background:${lineColor}"></div>` : nothing}
+                              ` : nothing}
+                            </div>
+
+                            <!-- Worker node -->
+                            <div style="
+                              background:${nodeBg};border:${nodeBorder};border-radius:8px;
+                              padding:10px 14px;text-align:center;min-width:150px;
+                              box-shadow:0 0 8px ${accentDim};margin-bottom:10px;
+                            ">
+                              <div style="font-weight:600;font-size:13px;color:var(--text)">${w.piper.type ?? w.name}</div>
+                            </div>
+
+                            <!-- Capability tags -->
+                            ${(w.piper.capabilities ?? []).length > 0 ? html`
+                              <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:170px">
+                                ${(w.piper.capabilities ?? []).map((c) => capTag(c))}
+                              </div>
+                            ` : nothing}
+                          </div>
+                        `;
+                      })}
+                    </div>
+                  ` : nothing}
+                </div>
+              `;
+            })}
           </div>
         ` : nothing}
 
