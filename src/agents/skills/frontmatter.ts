@@ -193,6 +193,25 @@ export function resolveOpenClawMetadata(
   const requires = resolveOpenClawManifestRequires(metadataObj);
   const install = resolveOpenClawManifestInstall(metadataObj, parseInstallSpec);
   const osRaw = resolveOpenClawManifestOs(metadataObj);
+  // Extract piper metadata if present
+  const piperRaw = metadataObj.piper;
+  const piper =
+    piperRaw &&
+    typeof piperRaw === "object" &&
+    typeof (piperRaw as Record<string, unknown>).role === "string"
+      ? {
+          role: (piperRaw as Record<string, unknown>).role as "manager" | "worker",
+          type:
+            typeof (piperRaw as Record<string, unknown>).type === "string"
+              ? ((piperRaw as Record<string, unknown>).type as string)
+              : undefined,
+          description:
+            typeof (piperRaw as Record<string, unknown>).description === "string"
+              ? ((piperRaw as Record<string, unknown>).description as string)
+              : undefined,
+        }
+      : undefined;
+
   return {
     always: typeof metadataObj.always === "boolean" ? metadataObj.always : undefined,
     emoji: typeof metadataObj.emoji === "string" ? metadataObj.emoji : undefined,
@@ -202,6 +221,7 @@ export function resolveOpenClawMetadata(
     os: osRaw.length > 0 ? osRaw : undefined,
     requires: requires,
     install: install.length > 0 ? install : undefined,
+    piper,
   };
 }
 
