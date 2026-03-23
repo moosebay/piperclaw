@@ -473,7 +473,7 @@ export class PiperApp extends LitElement {
           </div>
 
           <!-- All managers side by side -->
-          <div style="display:flex;justify-content:center;gap:60px;align-items:flex-start">
+          <div style="display:flex;justify-content:center;align-items:flex-start">
             ${managers.map((mgr, mgrIdx) => {
               const mgrWorkerNames = mgr.piper.workers ?? [];
               const mgrWorkers = mgrWorkerNames.map((n) => workerMap.get(n)).filter(Boolean) as typeof workers;
@@ -482,7 +482,7 @@ export class PiperApp extends LitElement {
               const isOnly = managers.length === 1;
 
               return html`
-                <div style="display:flex;flex-direction:column;align-items:center">
+                <div style="display:flex;flex-direction:column;align-items:center;padding:0 30px">
                   <!-- Top connector: vertical drop + horizontal half-lines for multi-manager -->
                   <div style="position:relative;width:100%;height:20px">
                     <!-- Vertical drop from center -->
@@ -516,7 +516,7 @@ export class PiperApp extends LitElement {
                         const wLast = wIdx === mgrWorkers.length - 1;
                         const wOnly = mgrWorkers.length === 1;
                         return html`
-                          <div style="display:flex;flex-direction:column;align-items:center;min-width:160px;padding:0 8px">
+                          <div style="display:flex;flex-direction:column;align-items:center;min-width:160px">
                             <!-- Worker top connector -->
                             <div style="position:relative;width:100%;height:18px">
                               <div style="position:absolute;left:50%;top:0;width:2px;height:100%;background:${lineColor};transform:translateX(-50%)"></div>
