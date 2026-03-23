@@ -101,6 +101,17 @@ export type TaskDetail = {
 // Controller state
 // ---------------------------------------------------------------------------
 
+export type PiperSkill = {
+  name: string;
+  description?: string;
+  emoji?: string;
+  piper: {
+    role: "manager" | "worker";
+    type?: string;
+    description?: string;
+  };
+};
+
 export type TasksState = {
   objectives: TaskObjective[];
   objectivesLoading: boolean;
@@ -113,6 +124,8 @@ export type TasksState = {
   auditLog: AuditEntry[];
   auditLoading: boolean;
   auditFilter: string;
+  piperSkills: PiperSkill[];
+  piperSkillsLoading: boolean;
   selectedObjectiveId: string | null;
   selectedTaskId: string | null;
   taskStatusFilter: string;
@@ -131,6 +144,8 @@ export const DEFAULT_TASKS_STATE: TasksState = {
   auditLog: [],
   auditLoading: false,
   auditFilter: "",
+  piperSkills: [],
+  piperSkillsLoading: false,
   selectedObjectiveId: null,
   selectedTaskId: null,
   taskStatusFilter: "all",
@@ -241,4 +256,19 @@ export async function cancelObjective(
   objectiveId: string,
 ): Promise<void> {
   await client.request("tasks.objectives.cancel", { id: objectiveId });
+}
+
+export async function loadPiperSkills(
+  client: GatewayBrowserClient,
+  state: TasksState,
+): Promise<void> {
+  state.piperSkillsLoading = true;
+  try {
+    const result = await client.request<{ skills: PiperSkill[] }>("tasks.skills.list", {});
+    state.piperSkills = result?.skills ?? [];
+  } catch {
+    state.piperSkills = [];
+  } finally {
+    state.piperSkillsLoading = false;
+  }
 }

@@ -198,6 +198,46 @@ export const tasksHandlers: GatewayRequestHandlers = {
     }
     respond(true, result);
   },
+
+  /** List skills tagged with Piper metadata (role, type). */
+  "tasks.skills.list": async ({ respond }) => {
+    try {
+      const { loadConfig } = await import("../../config/config.js");
+      const { resolveAgentWorkspaceDir, resolveDefaultAgentId } = await import(
+        "../../agents/agent-scope.js"
+      );
+      const { loadWorkspaceSkillEntries } = await import("../../agents/skills/workspace.js");
+
+      const cfg = loadConfig();
+      const agentId = resolveDefaultAgentId(cfg);
+      const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+      const entries = loadWorkspaceSkillEntries(workspaceDir, { config: cfg });
+
+      const piperSkills: Array<{
+        name: string;
+        description?: string;
+        emoji?: string;
+        piper: PiperSkillMetadata;
+      }> = [];
+      for (const entry of entries) {
+        const piper = entry.metadata?.piper;
+        if (piper?.role) {
+          piperSkills.push({
+            name: entry.skill.name,
+            description: entry.skill.description ?? piper.description,
+            emoji: entry.metadata?.emoji,
+            piper,
+          });
+        }
+      }
+      respond(true, { skills: piperSkills });
+    } catch (err) {
+      respond(false, undefined, {
+        code: "INTERNAL",
+        message: String(err),
+      });
+    }
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -230,3 +270,4 @@ import {
   getTaskStore as _getTaskStore,
   resumeTaskFromEvent as _resumeTaskFromEvent,
 } from "../../tasks/service.runtime.js";
+import type { PiperSkillMetadata } from "../../agents/skills/types.js";

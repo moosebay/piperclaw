@@ -11,6 +11,7 @@ import {
   loadTasks,
   loadTaskDetail,
   loadAuditLog,
+  loadPiperSkills,
   approveTask,
   rejectTask,
   cancelObjective,
@@ -19,7 +20,7 @@ import { renderObjectives } from "../src/ui/views/objectives.ts";
 import { renderTasksKanban } from "../src/ui/views/tasks-kanban.ts";
 import { renderAudit } from "../src/ui/views/audit.ts";
 
-type PiperTab = "objectives" | "tasks" | "audit";
+type PiperTab = "objectives" | "tasks" | "audit" | "skills";
 
 @customElement("piper-app")
 export class PiperApp extends LitElement {
@@ -231,6 +232,7 @@ export class PiperApp extends LitElement {
       loadObjectives(this.client, s),
       loadTasks(this.client, s),
       loadAuditLog(this.client, s),
+      loadPiperSkills(this.client, s),
     ]);
     this.tasksState = { ...s };
   }
@@ -256,6 +258,7 @@ export class PiperApp extends LitElement {
         ${this.tab === "objectives" ? this.renderObjectivesView() : nothing}
         ${this.tab === "tasks" ? this.renderTasksView() : nothing}
         ${this.tab === "audit" ? this.renderAuditView() : nothing}
+        ${this.tab === "skills" ? this.renderSkillsView() : nothing}
       </main>
     `;
   }
@@ -311,6 +314,10 @@ export class PiperApp extends LitElement {
           <a class="sidebar-item" ?data-active=${tab === "audit"} @click=${() => this.setTab("audit")}>
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/></svg>
             Audit Log
+          </a>
+          <a class="sidebar-item" ?data-active=${tab === "skills"} @click=${() => this.setTab("skills")}>
+            <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Skills
           </a>
         </div>
 
@@ -404,5 +411,77 @@ export class PiperApp extends LitElement {
         }
       },
     });
+  }
+
+  private renderSkillsView() {
+    const { piperSkills, piperSkillsLoading, tasks } = this.tasksState;
+    const managers = piperSkills.filter((s) => s.piper.role === "manager");
+    const workers = piperSkills.filter((s) => s.piper.role === "worker");
+
+    // Also show skills from tasks that aren't registered as Piper skills yet
+    const registeredNames = new Set(piperSkills.map((s) => s.name));
+    const taskSkills = new Map<string, number>();
+    for (const t of tasks) {
+      if (t.assignedSkill && !registeredNames.has(t.assignedSkill)) {
+        taskSkills.set(t.assignedSkill, (taskSkills.get(t.assignedSkill) ?? 0) + 1);
+      }
+    }
+
+    if (piperSkillsLoading) {
+      return html`<p style="color:var(--text-muted)">Loading skills...</p>`;
+    }
+
+    const skillCard = (s: typeof piperSkills[0]) => html`
+      <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:20px">${s.emoji ?? (s.piper.role === "manager" ? "👔" : "⚡")}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13px">${s.name}</div>
+          <div style="font-size:12px;color:var(--text-secondary)">${s.description ?? s.piper.description ?? ""}</div>
+        </div>
+        <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:${s.piper.role === "manager" ? "#3b82f620" : "#22c55e20"};color:${s.piper.role === "manager" ? "#3b82f6" : "#22c55e"};font-weight:600">${s.piper.type ?? s.piper.role}</span>
+      </div>
+    `;
+
+    return html`
+      <h2 style="font-size:18px;font-weight:700;margin-bottom:20px">Piper Skills</h2>
+
+      ${managers.length > 0 ? html`
+        <h3 style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin:16px 0 8px">Managers</h3>
+        <div style="display:grid;gap:8px;margin-bottom:24px">
+          ${managers.map(skillCard)}
+        </div>
+      ` : nothing}
+
+      ${workers.length > 0 ? html`
+        <h3 style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin:16px 0 8px">Workers</h3>
+        <div style="display:grid;gap:8px;margin-bottom:24px">
+          ${workers.map(skillCard)}
+        </div>
+      ` : nothing}
+
+      ${piperSkills.length === 0 && taskSkills.size === 0 ? html`
+        <div style="text-align:center;padding:40px;color:var(--text-muted)">
+          <p style="font-size:14px;margin-bottom:8px">No Piper skills registered yet.</p>
+          <p style="font-size:12px">Create a skill with <code>piper</code> metadata in your SKILL.md:</p>
+          <pre style="text-align:left;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;font-size:12px;color:var(--text-secondary)">metadata: { "openclaw": { "piper": { "role": "worker", "type": "researcher" } } }</pre>
+        </div>
+      ` : nothing}
+
+      ${taskSkills.size > 0 ? html`
+        <h3 style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin:16px 0 8px">Unregistered (from tasks)</h3>
+        <div style="display:grid;gap:8px">
+          ${[...taskSkills.entries()].map(([name, count]) => html`
+            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+              <span style="font-size:20px">❓</span>
+              <div style="flex:1">
+                <div style="font-weight:600;font-size:13px">${name}</div>
+                <div style="font-size:12px;color:var(--text-secondary)">${count} task${count > 1 ? "s" : ""} assigned</div>
+              </div>
+              <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#f59e0b20;color:#f59e0b;font-weight:600">unregistered</span>
+            </div>
+          `)}
+        </div>
+      ` : nothing}
+    `;
   }
 }

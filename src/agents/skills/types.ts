@@ -16,6 +16,17 @@ export type SkillInstallSpec = {
   targetDir?: string;
 };
 
+export type PiperSkillRole = "manager" | "worker";
+
+export type PiperSkillMetadata = {
+  /** Role in the task system: manager creates/orchestrates tasks, worker executes them. */
+  role: PiperSkillRole;
+  /** Skill type label for grouping in the dashboard (e.g. "researcher", "copywriter"). */
+  type?: string;
+  /** Short description of what this skill does in the Piper context. */
+  description?: string;
+};
+
 export type OpenClawSkillMetadata = {
   always?: boolean;
   skillKey?: string;
@@ -30,6 +41,8 @@ export type OpenClawSkillMetadata = {
     config?: string[];
   };
   install?: SkillInstallSpec[];
+  /** Piper task system metadata. Skills with this field show up on the Piper dashboard. */
+  piper?: PiperSkillMetadata;
 };
 
 export type SkillInvocationPolicy = {
