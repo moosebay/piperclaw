@@ -467,13 +467,15 @@ export class PiperApp extends LitElement {
 
         <!-- Managers row with horizontal connector -->
         ${managers.length > 0 ? html`
-          <div style="display:flex;justify-content:center;position:relative">
-            <!-- Horizontal line spanning all managers -->
-            ${managers.length > 1 ? html`
-              <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);height:2px;background:${lineColor};width:${Math.min(managers.length * 280, 800)}px"></div>
-            ` : nothing}
-          </div>
+          <!-- Horizontal bar connecting managers -->
+          ${managers.length > 1 ? html`
+            <div style="display:flex;justify-content:center">
+              <div style="height:2px;background:${lineColor};width:${Math.min(managers.length * 500, 1200)}px;max-width:90vw"></div>
+            </div>
+          ` : nothing}
 
+          <!-- All managers in a horizontal row -->
+          <div style="display:flex;justify-content:center;gap:40px;align-items:flex-start">
           ${managers.map((mgr) => {
             const mgrWorkerNames = mgr.piper.workers ?? [];
             const mgrWorkers = mgrWorkerNames.map((n) => workerMap.get(n)).filter(Boolean) as typeof workers;
@@ -533,6 +535,7 @@ export class PiperApp extends LitElement {
               </div>
             `;
           })}
+          </div>
         ` : nothing}
 
         ${(() => {
