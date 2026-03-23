@@ -1424,7 +1424,11 @@ export type PluginHookName =
   | "subagent_spawned"
   | "subagent_ended"
   | "gateway_start"
-  | "gateway_stop";
+  | "gateway_stop"
+  | "task_ready"
+  | "task_completed"
+  | "task_failed"
+  | "objective_completed";
 
 export const PLUGIN_HOOK_NAMES = [
   "before_model_resolve",
@@ -1452,6 +1456,10 @@ export const PLUGIN_HOOK_NAMES = [
   "subagent_ended",
   "gateway_start",
   "gateway_stop",
+  "task_ready",
+  "task_completed",
+  "task_failed",
+  "objective_completed",
 ] as const satisfies readonly PluginHookName[];
 
 type MissingPluginHookNames = Exclude<PluginHookName, (typeof PLUGIN_HOOK_NAMES)[number]>;
@@ -1897,6 +1905,46 @@ export type PluginHookGatewayStopEvent = {
   reason?: string;
 };
 
+// Task context shared across task hooks
+export type PluginHookTaskContext = {
+  agentId: string;
+  objectiveId: string;
+};
+
+// task_ready hook
+export type PluginHookTaskReadyEvent = {
+  taskId: string;
+  title: string;
+  assignedSkill?: string;
+  group?: string;
+};
+
+// task_completed hook
+export type PluginHookTaskCompletedEvent = {
+  taskId: string;
+  title: string;
+  reportId?: string;
+};
+
+// task_failed hook
+export type PluginHookTaskFailedEvent = {
+  taskId: string;
+  title: string;
+  error?: string;
+  retryCount: number;
+  maxRetries: number;
+  retriesExhausted: boolean;
+};
+
+// objective_completed hook
+export type PluginHookObjectiveCompletedEvent = {
+  objectiveId: string;
+  title: string;
+  completedTasks: number;
+  failedTasks: number;
+  cancelledTasks: number;
+};
+
 // Hook handler types mapped by hook name
 export type PluginHookHandlerMap = {
   before_model_resolve: (
@@ -1998,6 +2046,19 @@ export type PluginHookHandlerMap = {
   gateway_stop: (
     event: PluginHookGatewayStopEvent,
     ctx: PluginHookGatewayContext,
+  ) => Promise<void> | void;
+  task_ready: (event: PluginHookTaskReadyEvent, ctx: PluginHookTaskContext) => Promise<void> | void;
+  task_completed: (
+    event: PluginHookTaskCompletedEvent,
+    ctx: PluginHookTaskContext,
+  ) => Promise<void> | void;
+  task_failed: (
+    event: PluginHookTaskFailedEvent,
+    ctx: PluginHookTaskContext,
+  ) => Promise<void> | void;
+  objective_completed: (
+    event: PluginHookObjectiveCompletedEvent,
+    ctx: PluginHookTaskContext,
   ) => Promise<void> | void;
 };
 

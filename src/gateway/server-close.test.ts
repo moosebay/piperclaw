@@ -20,6 +20,7 @@ describe("createGatewayCloseHandler", () => {
       stopChannel: vi.fn(async () => undefined),
       pluginServices: null,
       cron: { stop: vi.fn() },
+      taskService: null,
       heartbeatRunner: { stop: vi.fn() } as never,
       updateCheckStop: null,
       nodePresenceTimers: new Map(),

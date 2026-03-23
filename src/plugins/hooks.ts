@@ -53,6 +53,11 @@ import type {
   PluginHookToolResultPersistResult,
   PluginHookBeforeMessageWriteEvent,
   PluginHookBeforeMessageWriteResult,
+  PluginHookTaskContext,
+  PluginHookTaskReadyEvent,
+  PluginHookTaskCompletedEvent,
+  PluginHookTaskFailedEvent,
+  PluginHookObjectiveCompletedEvent,
 } from "./types.js";
 
 // Re-export types for consumers
@@ -100,6 +105,11 @@ export type {
   PluginHookGatewayContext,
   PluginHookGatewayStartEvent,
   PluginHookGatewayStopEvent,
+  PluginHookTaskContext,
+  PluginHookTaskReadyEvent,
+  PluginHookTaskCompletedEvent,
+  PluginHookTaskFailedEvent,
+  PluginHookObjectiveCompletedEvent,
 };
 
 export type HookRunnerLogger = {
@@ -901,6 +911,38 @@ export function createHookRunner(registry: PluginRegistry, options: HookRunnerOp
   }
 
   // =========================================================================
+  // Task hooks
+  // =========================================================================
+
+  async function runTaskReady(
+    event: PluginHookTaskReadyEvent,
+    ctx: PluginHookTaskContext,
+  ): Promise<void> {
+    return runVoidHook("task_ready", event, ctx);
+  }
+
+  async function runTaskCompleted(
+    event: PluginHookTaskCompletedEvent,
+    ctx: PluginHookTaskContext,
+  ): Promise<void> {
+    return runVoidHook("task_completed", event, ctx);
+  }
+
+  async function runTaskFailed(
+    event: PluginHookTaskFailedEvent,
+    ctx: PluginHookTaskContext,
+  ): Promise<void> {
+    return runVoidHook("task_failed", event, ctx);
+  }
+
+  async function runObjectiveCompleted(
+    event: PluginHookObjectiveCompletedEvent,
+    ctx: PluginHookTaskContext,
+  ): Promise<void> {
+    return runVoidHook("objective_completed", event, ctx);
+  }
+
+  // =========================================================================
   // Utility
   // =========================================================================
 
@@ -952,6 +994,11 @@ export function createHookRunner(registry: PluginRegistry, options: HookRunnerOp
     // Gateway hooks
     runGatewayStart,
     runGatewayStop,
+    // Task hooks
+    runTaskReady,
+    runTaskCompleted,
+    runTaskFailed,
+    runObjectiveCompleted,
     // Utility
     hasHooks,
     getHookCount,

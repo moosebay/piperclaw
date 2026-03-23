@@ -1,4 +1,5 @@
 import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
+import { notifyTaskCompletionFromSubagent } from "../tasks/service.runtime.js";
 import type { SubagentRunOutcome } from "./subagent-announce.js";
 import {
   SUBAGENT_ENDED_OUTCOME_ERROR,
@@ -9,6 +10,18 @@ import {
   type SubagentLifecycleEndedReason,
 } from "./subagent-lifecycle-events.js";
 import type { SubagentRunRecord } from "./subagent-registry.types.js";
+
+async function notifyTaskCompletionFromSubagentSafe(
+  runId: string,
+  outcome: string | undefined,
+  error: string | undefined,
+): Promise<void> {
+  try {
+    await notifyTaskCompletionFromSubagent(runId, outcome, error);
+  } catch {
+    // Task service may not be running — safe to ignore
+  }
+}
 
 export function runOutcomesEqual(
   a: SubagentRunOutcome | undefined,
@@ -87,6 +100,10 @@ export async function emitSubagentEndedHookOnce(params: {
     }
     params.entry.endedHookEmittedAt = Date.now();
     params.persist();
+
+    // If this subagent was spawned for a task, notify the task service
+    void notifyTaskCompletionFromSubagentSafe(params.entry.runId, params.outcome, params.error);
+
     return true;
   } catch {
     return false;

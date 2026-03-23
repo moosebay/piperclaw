@@ -1013,6 +1013,17 @@ export async function startGatewayServer(
     void cron.start().catch((err) => logCron.error(`failed to start: ${String(err)}`));
   }
 
+  // Start task service (objectives/tasks/reports dispatch)
+  let taskService: { stop: () => void } | null = null;
+  if (!minimalTestGateway) {
+    try {
+      const { startTaskService } = await import("../tasks/service.js");
+      taskService = startTaskService();
+    } catch (err) {
+      log.warn(`task service failed to start: ${String(err)}`);
+    }
+  }
+
   const stopModelPricingRefresh =
     !minimalTestGateway && process.env.VITEST !== "1"
       ? startGatewayModelPricingRefresh({ config: cfgAtStart })
@@ -1309,6 +1320,7 @@ export async function startGatewayServer(
     stopChannel,
     pluginServices,
     cron,
+    taskService,
     heartbeatRunner,
     updateCheckStop: stopGatewayUpdateCheck,
     nodePresenceTimers,

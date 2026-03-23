@@ -164,6 +164,33 @@ const entries: SubCliEntry[] = [
     },
   },
   {
+    name: "objectives",
+    description: "Manage task-system objectives",
+    hasSubcommands: true,
+    register: async (program) => {
+      const mod = await import("../tasks-cli.js");
+      mod.registerTasksCli(program);
+    },
+  },
+  {
+    name: "tasks",
+    description: "Manage task-system tasks",
+    hasSubcommands: true,
+    register: async (program) => {
+      const mod = await import("../tasks-cli.js");
+      mod.registerTasksCli(program);
+    },
+  },
+  {
+    name: "reports",
+    description: "Manage task-system reports",
+    hasSubcommands: true,
+    register: async (program) => {
+      const mod = await import("../tasks-cli.js");
+      mod.registerTasksCli(program);
+    },
+  },
+  {
     name: "dns",
     description: "DNS helpers for wide-area discovery (Tailscale + CoreDNS)",
     hasSubcommands: true,
