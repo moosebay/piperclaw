@@ -465,76 +465,66 @@ export class PiperApp extends LitElement {
           </div>
         ` : nothing}
 
-        <!-- Managers row with horizontal connector -->
+        <!-- Managers + Workers org chart -->
         ${managers.length > 0 ? html`
-          <!-- Horizontal bar connecting managers -->
-          ${managers.length > 1 ? html`
-            <div style="display:flex;justify-content:center">
-              <div style="height:2px;background:${lineColor};width:${Math.min(managers.length * 500, 1200)}px;max-width:90vw"></div>
-            </div>
-          ` : nothing}
+          <!-- Vertical stem from Piper to manager row -->
+          <div style="display:flex;justify-content:center">
+            <div style="width:2px;height:20px;background:${lineColor}"></div>
+          </div>
 
-          <!-- All managers in a horizontal row -->
-          <div style="display:flex;justify-content:center;gap:40px;align-items:flex-start">
-          ${managers.map((mgr) => {
-            const mgrWorkerNames = mgr.piper.workers ?? [];
-            const mgrWorkers = mgrWorkerNames.map((n) => workerMap.get(n)).filter(Boolean) as typeof workers;
+          <!-- Manager row: horizontal bar auto-sized by flex children -->
+          <div style="display:flex;justify-content:center">
+            <div style="display:inline-flex;align-items:flex-start;gap:0;${managers.length > 1 ? `border-top:2px solid ${lineColor}` : ""}">
+              ${managers.map((mgr) => {
+                const mgrWorkerNames = mgr.piper.workers ?? [];
+                const mgrWorkers = mgrWorkerNames.map((n) => workerMap.get(n)).filter(Boolean) as typeof workers;
 
-            return html`
-              <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:48px">
-                <!-- Vertical line down to manager -->
-                <div style="width:2px;height:20px;background:${lineColor}"></div>
+                return html`
+                  <div style="display:flex;flex-direction:column;align-items:center;padding:0 24px">
+                    <!-- Vertical line down to manager -->
+                    <div style="width:2px;height:20px;background:${lineColor}"></div>
 
-                <!-- Manager node -->
-                <div style="
-                  background:${nodeBg};border:${nodeBorder};border-radius:8px;
-                  padding:14px 32px;text-align:center;min-width:200px;
-                  box-shadow:0 0 16px ${accentDim};
-                ">
-                  <div style="font-weight:700;font-size:15px;color:var(--text)">${mgr.piper.type ?? mgr.name}</div>
-                </div>
+                    <!-- Manager node -->
+                    <div style="
+                      background:${nodeBg};border:${nodeBorder};border-radius:8px;
+                      padding:14px 32px;text-align:center;min-width:200px;
+                      box-shadow:0 0 16px ${accentDim};
+                    ">
+                      <div style="font-weight:700;font-size:15px;color:var(--text)">${mgr.piper.type ?? mgr.name}</div>
+                    </div>
 
-                <!-- Workers under this manager -->
-                ${mgrWorkers.length > 0 ? html`
-                  <!-- Vertical line from manager to horizontal bar -->
-                  <div style="width:2px;height:24px;background:${lineColor}"></div>
+                    <!-- Workers under this manager -->
+                    ${mgrWorkers.length > 0 ? html`
+                      <div style="display:flex;flex-direction:column;align-items:center">
+                        <!-- Vertical stem to worker row -->
+                        <div style="width:2px;height:24px;background:${lineColor}"></div>
 
-                  <!-- Horizontal bar connecting all workers -->
-                  <div style="
-                    height:2px;background:${lineColor};
-                    width:${Math.max(mgrWorkers.length * 180, 200)}px;
-                    max-width:90vw;
-                  "></div>
-
-                  <!-- Workers row -->
-                  <div style="display:flex;justify-content:center;gap:0">
-                    ${mgrWorkers.map((w) => html`
-                      <div style="display:flex;flex-direction:column;align-items:center;width:180px">
-                        <!-- Vertical line down to worker -->
-                        <div style="width:2px;height:18px;background:${lineColor}"></div>
-
-                        <!-- Worker node -->
-                        <div style="
-                          background:${nodeBg};border:${nodeBorder};border-radius:8px;
-                          padding:10px 14px;text-align:center;min-width:150px;
-                          box-shadow:0 0 8px ${accentDim};margin-bottom:10px;
-                        ">
-                          <div style="font-weight:600;font-size:13px;color:var(--text)">${w.piper.type ?? w.name}</div>
+                        <!-- Worker row: bar auto-sized -->
+                        <div style="display:inline-flex;align-items:flex-start;gap:0;${mgrWorkers.length > 1 ? `border-top:2px solid ${lineColor}` : ""}">
+                          ${mgrWorkers.map((w) => html`
+                            <div style="display:flex;flex-direction:column;align-items:center;padding:0 8px;min-width:160px">
+                              <div style="width:2px;height:18px;background:${lineColor}"></div>
+                              <div style="
+                                background:${nodeBg};border:${nodeBorder};border-radius:8px;
+                                padding:10px 14px;text-align:center;min-width:150px;
+                                box-shadow:0 0 8px ${accentDim};margin-bottom:10px;
+                              ">
+                                <div style="font-weight:600;font-size:13px;color:var(--text)">${w.piper.type ?? w.name}</div>
+                              </div>
+                              ${(w.piper.capabilities ?? []).length > 0 ? html`
+                                <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:170px">
+                                  ${(w.piper.capabilities ?? []).map((c) => capTag(c))}
+                                </div>
+                              ` : nothing}
+                            </div>
+                          `)}
                         </div>
-
-                        <!-- Capability tags -->
-                        ${(w.piper.capabilities ?? []).length > 0 ? html`
-                          <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:170px">
-                            ${(w.piper.capabilities ?? []).map((c) => capTag(c))}
-                          </div>
-                        ` : nothing}
                       </div>
-                    `)}
+                    ` : nothing}
                   </div>
-                ` : nothing}
-              </div>
-            `;
-          })}
+                `;
+              })}
+            </div>
           </div>
         ` : nothing}
 
