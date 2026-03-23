@@ -1,4 +1,4 @@
-# 🦞 OpenClaw — Personal AI Assistant
+# 🦞 CoreClaw — OpenClaw Fork with Piper Task System
 
 <p align="center">
     <picture>
@@ -8,8 +8,100 @@
 </p>
 
 <p align="center">
-  <strong>EXFOLIATE! EXFOLIATE!</strong>
+  <strong>OpenClaw + Piper: Task-driven AI workforce with manager/worker hierarchy</strong>
 </p>
+
+---
+
+## Piper — Task-Driven Workflow Engine
+
+This fork adds **Piper**, a native workflow engine built on top of OpenClaw. Piper turns your AI assistant into a managed workforce with objectives, tasks, and a manager/worker skill hierarchy.
+
+<p align="center">
+  <img src="docs/images/piper-hierarchy.jpeg" alt="Piper Hierarchy Dashboard" width="900">
+</p>
+
+### What Piper adds
+
+- **Objectives & Tasks** — Create objectives that decompose into tasks with dependencies (DAG), priority, groups, and retry with exponential backoff
+- **Manager/Worker Hierarchy** — Managers orchestrate objectives and dispatch tasks to worker skills. Workers execute and report back. Clear separation enforced via tooling
+- **Durable Workflow Primitives** — `waitForEvent` (task suspends until external signal), durable step checkpoints (context accumulates across runs), event bus (pull-on-emit, instant resume)
+- **HITL (Human-in-the-Loop)** — Tasks can pause for human approval. User gets notified, approves via CLI/chat/dashboard, task resumes with full context
+- **Notifications** — Outbound messages to Telegram/WhatsApp when objectives complete or tasks fail
+- **Fallback Report Capture** — If a worker doesn't call the report tool, output is auto-captured from the subagent session
+- **Audit Log** — Full state transition history for every objective and task
+- **Piper Dashboard** — Standalone web UI at `/piper` with:
+  - **Objectives** view with progress bars
+  - **Tasks** kanban board (Pending → Ready → Running → Waiting → Completed → Failed)
+  - **Audit Log** with filterable state transitions
+  - **Hierarchy** chart showing manager/worker org structure with capability tags
+- **Gateway RPC** — 12 endpoints for programmatic access (`tasks.list`, `tasks.approve`, `tasks.events.emit`, etc.) + WebSocket broadcast for real-time updates
+- **CLI** — `openclaw objectives`, `openclaw tasks`, `openclaw reports` commands with approve/reject/cancel/audit/import
+- **Piper Skills** — Create manager and worker skills via chat. Just say *"Use piper structure and create a Sales Manager with..."* and the agent creates the skill files with the correct metadata
+
+### Piper skill structure
+
+Skills are regular OpenClaw skills with `piper` metadata in their SKILL.md frontmatter:
+
+```yaml
+# Manager
+metadata: { "openclaw": { "emoji": "📦", "piper": {
+  "role": "manager",
+  "type": "Sales Manager",
+  "workers": ["linkedin-automation", "target-finder", "email-sender"]
+} } }
+
+# Worker
+metadata: { "openclaw": { "emoji": "🔗", "piper": {
+  "role": "worker",
+  "type": "LinkedIn Automation",
+  "capabilities": ["Send Connection", "Follow Up Message", "Profile Visit"]
+} } }
+```
+
+### Quick start with Piper
+
+```bash
+# Start the gateway (Piper task service starts automatically)
+openclaw gateway run
+
+# Open the Piper dashboard
+open http://127.0.0.1:18789/piper?token=YOUR_TOKEN
+
+# Or use the CLI
+openclaw objectives create "Launch outbound campaign" --description "..."
+openclaw tasks create "Research competitors" --objective <ID> --skill researcher
+openclaw tasks list
+openclaw tasks approve <ID>
+openclaw tasks waiting
+```
+
+### Architecture
+
+```
+SQLite Store (WAL mode, atomic claiming, idempotent completion)
+    ├── objectives, tasks, reports, steps, events, wait_conditions, audit_log
+    │
+Dispatcher (5s tick loop)
+    ├── Concurrency control, retry with backoff, rate limiting
+    ├── Stuck/orphan/expired sweeps, event cleanup
+    ├── Manager wake deduplication
+    │
+Workflow Engine
+    ├── waitForEvent / notify (task suspend/resume)
+    ├── Durable step checkpoints (context injection on resume)
+    ├── Event bus (pull-on-emit, TOCTOU-safe)
+    │
+Integration
+    ├── Gateway RPC (12 endpoints) + WS broadcast
+    ├── Plugin hooks (task_ready, task_completed, task_failed, task_waiting, task_resumed, objective_completed)
+    ├── Subagent completion bridge (frozenResultText fallback)
+    └── Outbound notifications (Telegram/WhatsApp)
+```
+
+---
+
+## OpenClaw (upstream)
 
 <p align="center">
   <a href="https://github.com/openclaw/openclaw/actions/workflows/ci.yml?branch=main"><img src="https://img.shields.io/github/actions/workflow/status/openclaw/openclaw/ci.yml?branch=main&style=for-the-badge" alt="CI status"></a>
