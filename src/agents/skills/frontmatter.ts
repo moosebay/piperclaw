@@ -214,6 +214,11 @@ export function resolveOpenClawMetadata(
                 (w) => typeof w === "string",
               )
             : undefined,
+          capabilities: Array.isArray((piperRaw as Record<string, unknown>).capabilities)
+            ? ((piperRaw as Record<string, unknown>).capabilities as string[]).filter(
+                (c) => typeof c === "string",
+              )
+            : undefined,
         }
       : undefined;
 

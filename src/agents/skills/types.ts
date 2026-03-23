@@ -27,6 +27,8 @@ export type PiperSkillMetadata = {
   description?: string;
   /** Worker skill names this manager uses. Only relevant for managers. */
   workers?: string[];
+  /** Capability labels shown as tags under the worker in the hierarchy chart. */
+  capabilities?: string[];
 };
 
 export type OpenClawSkillMetadata = {

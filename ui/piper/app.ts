@@ -414,135 +414,148 @@ export class PiperApp extends LitElement {
   }
 
   private renderSkillsView() {
-    const { piperSkills, piperSkillsLoading, tasks } = this.tasksState;
+    const { piperSkills, piperSkillsLoading } = this.tasksState;
     const managers = piperSkills.filter((s) => s.piper.role === "manager");
     const workers = piperSkills.filter((s) => s.piper.role === "worker");
-
-    // Unregistered skills from tasks
-    const registeredNames = new Set(piperSkills.map((s) => s.name));
-    const taskSkills = new Map<string, number>();
-    for (const t of tasks) {
-      if (t.assignedSkill && !registeredNames.has(t.assignedSkill)) {
-        taskSkills.set(t.assignedSkill, (taskSkills.get(t.assignedSkill) ?? 0) + 1);
-      }
-    }
+    const workerMap = new Map(workers.map((w) => [w.name, w]));
 
     if (piperSkillsLoading) {
       return html`<p style="color:var(--text-muted)">Loading...</p>`;
     }
 
-    if (piperSkills.length === 0 && taskSkills.size === 0) {
+    if (piperSkills.length === 0) {
       return html`
-        <h2 style="font-size:18px;font-weight:700;margin-bottom:20px">Hierarchy</h2>
-        <div style="text-align:center;padding:40px;color:var(--text-muted)">
-          <p style="font-size:14px;margin-bottom:8px">No Piper skills registered yet.</p>
-          <p style="font-size:12px">Add <code>piper</code> metadata to your SKILL.md frontmatter.</p>
+        <div style="display:flex;flex-direction:column;align-items:center;padding:60px 20px;color:var(--text-muted)">
+          <div style="font-size:36px;margin-bottom:12px">⚡</div>
+          <p style="font-size:15px;margin-bottom:6px">No Piper skills registered yet.</p>
+          <p style="font-size:12px">Say <em>"Create a piper team for..."</em> in chat to get started.</p>
         </div>
       `;
     }
 
-    // Styles
-    const nodeBase = "background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px";
-    const managerBorder = "border-left:3px solid #3b82f6";
-    const workerBorder = "border-left:3px solid #22c55e";
-    const unregBorder = "border-left:3px solid #f59e0b";
-    const badge = (text: string, bg: string, fg: string) =>
-      html`<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${bg};color:${fg};font-weight:600;text-transform:uppercase;letter-spacing:0.5px">${text}</span>`;
-    const connector = "width:2px;background:var(--border);margin-left:28px";
-    const branch = "display:flex;align-items:stretch;gap:0";
+    // --- Org chart styles ---
+    const accent = "#3b82f6";
+    const accentDim = "#3b82f630";
+    const nodeBg = "#0f1923";
+    const nodeBorder = `1px solid ${accent}`;
+    const lineColor = accent;
 
-    const workerNode = (s: typeof piperSkills[0]) => html`
-      <div style="${nodeBase};${workerBorder}">
-        <span style="font-size:18px">${s.emoji ?? "⚡"}</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:13px">${s.name}</div>
-          <div style="font-size:11px;color:var(--text-secondary)">${s.description ?? s.piper.description ?? ""}</div>
-        </div>
-        ${badge(s.piper.type ?? "worker", "#22c55e15", "#22c55e")}
-      </div>
-    `;
-
-    const unregNode = (name: string, count: number) => html`
-      <div style="${nodeBase};${unregBorder}">
-        <span style="font-size:18px">❓</span>
-        <div style="flex:1">
-          <div style="font-weight:600;font-size:13px">${name}</div>
-          <div style="font-size:11px;color:var(--text-secondary)">${count} task${count > 1 ? "s" : ""} assigned</div>
-        </div>
-        ${badge("unregistered", "#f59e0b15", "#f59e0b")}
-      </div>
+    const capTag = (label: string) => html`
+      <span style="
+        font-size:11px;padding:4px 10px;border-radius:4px;
+        border:1px solid ${accent}50;background:${nodeBg};
+        color:${accent};white-space:nowrap;
+      ">${label}</span>
     `;
 
     return html`
-      <h2 style="font-size:18px;font-weight:700;margin-bottom:24px">Hierarchy</h2>
+      <div style="padding:20px 0;overflow-x:auto">
+        <!-- Piper logo/header -->
+        <div style="text-align:center;margin-bottom:32px">
+          <div style="font-size:28px;font-weight:800;letter-spacing:-1px">
+            <span style="color:${accent}">P</span><span style="color:var(--text)">iper</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Skill Hierarchy</div>
+        </div>
 
-      ${managers.map((mgr) => {
-        // Find this manager's declared workers
-        const mgrWorkerNames = new Set(mgr.piper.workers ?? []);
-        const mgrWorkers = mgrWorkerNames.size > 0
-          ? workers.filter((w) => mgrWorkerNames.has(w.name))
-          : [];
-        // Unregistered workers for this manager
-        const mgrUnreg = mgrWorkerNames.size > 0
-          ? [...taskSkills.entries()].filter(([name]) => mgrWorkerNames.has(name))
-          : [];
-        // Workers declared but not found as registered skills
-        const missingWorkers = [...mgrWorkerNames].filter(
-          (name) => !workers.some((w) => w.name === name) && !taskSkills.has(name),
-        );
+        <!-- Vertical line from header to managers row -->
+        ${managers.length > 0 ? html`
+          <div style="display:flex;justify-content:center">
+            <div style="width:2px;height:24px;background:${lineColor}"></div>
+          </div>
+        ` : nothing}
 
-        return html`
-          <!-- Manager node -->
-          <div style="${nodeBase};${managerBorder};margin-bottom:4px">
-            <span style="font-size:22px">${mgr.emoji ?? "👔"}</span>
-            <div style="flex:1;min-width:0">
-              <div style="font-weight:700;font-size:14px">${mgr.name}</div>
-              <div style="font-size:11px;color:var(--text-secondary)">${mgr.description ?? mgr.piper.description ?? ""}</div>
-            </div>
-            ${badge(mgr.piper.type ?? "manager", "#3b82f615", "#3b82f6")}
+        <!-- Managers row with horizontal connector -->
+        ${managers.length > 0 ? html`
+          <div style="display:flex;justify-content:center;position:relative">
+            <!-- Horizontal line spanning all managers -->
+            ${managers.length > 1 ? html`
+              <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);height:2px;background:${lineColor};width:${Math.min(managers.length * 280, 800)}px"></div>
+            ` : nothing}
           </div>
 
-          <!-- Connector + Workers -->
-          <div style="margin-left:28px;border-left:2px solid var(--border);padding-left:20px;margin-bottom:24px">
-            <div style="display:grid;gap:6px;padding-top:6px">
-              ${mgrWorkers.map((w) => workerNode(w))}
-              ${mgrUnreg.map(([name, count]) => unregNode(name, count))}
-              ${missingWorkers.map((name) => html`
-                <div style="${nodeBase};${unregBorder}">
-                  <span style="font-size:18px">⚠️</span>
-                  <div style="flex:1">
-                    <div style="font-weight:600;font-size:13px">${name}</div>
-                    <div style="font-size:11px;color:var(--text-secondary)">Declared but skill not found</div>
+          ${managers.map((mgr) => {
+            const mgrWorkerNames = mgr.piper.workers ?? [];
+            const mgrWorkers = mgrWorkerNames.map((n) => workerMap.get(n)).filter(Boolean) as typeof workers;
+
+            return html`
+              <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:48px">
+                <!-- Vertical line down to manager -->
+                <div style="width:2px;height:20px;background:${lineColor}"></div>
+
+                <!-- Manager node -->
+                <div style="
+                  background:${nodeBg};border:${nodeBorder};border-radius:8px;
+                  padding:14px 32px;text-align:center;min-width:200px;
+                  box-shadow:0 0 16px ${accentDim};
+                ">
+                  <div style="font-weight:700;font-size:15px;color:var(--text)">${mgr.piper.type ?? mgr.name}</div>
+                </div>
+
+                <!-- Workers under this manager -->
+                ${mgrWorkers.length > 0 ? html`
+                  <!-- Vertical line from manager to horizontal bar -->
+                  <div style="width:2px;height:24px;background:${lineColor}"></div>
+
+                  <!-- Horizontal bar connecting all workers -->
+                  <div style="
+                    height:2px;background:${lineColor};
+                    width:${Math.max(mgrWorkers.length * 180, 200)}px;
+                    max-width:90vw;
+                  "></div>
+
+                  <!-- Workers row -->
+                  <div style="display:flex;justify-content:center;gap:0">
+                    ${mgrWorkers.map((w) => html`
+                      <div style="display:flex;flex-direction:column;align-items:center;width:180px">
+                        <!-- Vertical line down to worker -->
+                        <div style="width:2px;height:18px;background:${lineColor}"></div>
+
+                        <!-- Worker node -->
+                        <div style="
+                          background:${nodeBg};border:${nodeBorder};border-radius:8px;
+                          padding:10px 14px;text-align:center;min-width:150px;
+                          box-shadow:0 0 8px ${accentDim};margin-bottom:10px;
+                        ">
+                          <div style="font-weight:600;font-size:13px;color:var(--text)">${w.piper.type ?? w.name}</div>
+                        </div>
+
+                        <!-- Capability tags -->
+                        ${(w.piper.capabilities ?? []).length > 0 ? html`
+                          <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:170px">
+                            ${(w.piper.capabilities ?? []).map((c) => capTag(c))}
+                          </div>
+                        ` : nothing}
+                      </div>
+                    `)}
                   </div>
-                  ${badge("missing", "#ef444415", "#ef4444")}
-                </div>
-              `)}
-              ${mgrWorkerNames.size === 0 ? html`
-                <div style="padding:8px 0;color:var(--text-muted);font-size:12px;font-style:italic">
-                  No workers declared. Add <code>"workers": ["skill-name"]</code> to this manager's piper metadata.
-                </div>
-              ` : nothing}
-            </div>
-          </div>
-        `;
-      })}
+                ` : nothing}
+              </div>
+            `;
+          })}
+        ` : nothing}
 
-      ${(() => {
-        // Workers not assigned to any manager
-        const allMgrWorkers = new Set(managers.flatMap((m) => m.piper.workers ?? []));
-        const unassignedWorkers = workers.filter((w) => !allMgrWorkers.has(w.name));
-        const unassignedUnreg = [...taskSkills.entries()].filter(([name]) => !allMgrWorkers.has(name));
-        if (unassignedWorkers.length === 0 && unassignedUnreg.length === 0) return nothing;
-        return html`
-          <div style="padding:8px 0 8px 0;margin-bottom:8px;margin-top:8px">
-            <span style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600">Unassigned Workers</span>
-          </div>
-          <div style="display:grid;gap:6px;margin-bottom:24px">
-            ${unassignedWorkers.map((w) => workerNode(w))}
-            ${unassignedUnreg.map(([name, count]) => unregNode(name, count))}
-          </div>
-        `;
-      })()}
+        ${(() => {
+          const allMgrWorkers = new Set(managers.flatMap((m) => m.piper.workers ?? []));
+          const unassigned = workers.filter((w) => !allMgrWorkers.has(w.name));
+          if (unassigned.length === 0) return nothing;
+          return html`
+            <div style="margin-top:40px;text-align:center">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Unassigned Workers</div>
+              <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center">
+                ${unassigned.map((w) => html`
+                  <div style="
+                    background:${nodeBg};border:1px solid var(--border);border-radius:8px;
+                    padding:10px 16px;text-align:center;min-width:120px;opacity:0.6;
+                  ">
+                    <div style="font-weight:600;font-size:13px;color:var(--text)">${w.piper.type ?? w.name}</div>
+                  </div>
+                `)}
+              </div>
+            </div>
+          `;
+        })()}
+      </div>
     `;
   }
 }

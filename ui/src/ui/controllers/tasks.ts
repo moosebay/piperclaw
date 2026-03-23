@@ -110,6 +110,7 @@ export type PiperSkill = {
     type?: string;
     description?: string;
     workers?: string[];
+    capabilities?: string[];
   };
 };
 
