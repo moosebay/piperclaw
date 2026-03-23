@@ -484,7 +484,7 @@ export class PiperApp extends LitElement {
               return html`
                 <div style="display:flex;flex-direction:column;align-items:center;padding:0 30px">
                   <!-- Top connector: vertical drop + horizontal half-lines for multi-manager -->
-                  <div style="position:relative;width:100%;height:20px">
+                  <div style="position:relative;width:calc(100% + 60px);margin:0 -30px;height:20px">
                     <!-- Vertical drop from center -->
                     <div style="position:absolute;left:50%;top:0;width:2px;height:100%;background:${lineColor};transform:translateX(-50%)"></div>
                     ${!isOnly ? html`
