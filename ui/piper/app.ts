@@ -476,36 +476,73 @@ export class PiperApp extends LitElement {
     return html`
       <h2 style="font-size:18px;font-weight:700;margin-bottom:24px">Hierarchy</h2>
 
-      ${managers.map((mgr) => html`
-        <!-- Manager node -->
-        <div style="${nodeBase};${managerBorder};margin-bottom:4px">
-          <span style="font-size:22px">${mgr.emoji ?? "👔"}</span>
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:700;font-size:14px">${mgr.name}</div>
-            <div style="font-size:11px;color:var(--text-secondary)">${mgr.description ?? mgr.piper.description ?? ""}</div>
-          </div>
-          ${badge(mgr.piper.type ?? "manager", "#3b82f615", "#3b82f6")}
-        </div>
+      ${managers.map((mgr) => {
+        // Find this manager's declared workers
+        const mgrWorkerNames = new Set(mgr.piper.workers ?? []);
+        const mgrWorkers = mgrWorkerNames.size > 0
+          ? workers.filter((w) => mgrWorkerNames.has(w.name))
+          : [];
+        // Unregistered workers for this manager
+        const mgrUnreg = mgrWorkerNames.size > 0
+          ? [...taskSkills.entries()].filter(([name]) => mgrWorkerNames.has(name))
+          : [];
+        // Workers declared but not found as registered skills
+        const missingWorkers = [...mgrWorkerNames].filter(
+          (name) => !workers.some((w) => w.name === name) && !taskSkills.has(name),
+        );
 
-        <!-- Connector + Workers -->
-        <div style="margin-left:28px;border-left:2px solid var(--border);padding-left:20px;margin-bottom:24px">
-          <div style="display:grid;gap:6px;padding-top:6px">
-            ${workers.map((w) => workerNode(w))}
-            ${[...taskSkills.entries()].map(([name, count]) => unregNode(name, count))}
+        return html`
+          <!-- Manager node -->
+          <div style="${nodeBase};${managerBorder};margin-bottom:4px">
+            <span style="font-size:22px">${mgr.emoji ?? "👔"}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:14px">${mgr.name}</div>
+              <div style="font-size:11px;color:var(--text-secondary)">${mgr.description ?? mgr.piper.description ?? ""}</div>
+            </div>
+            ${badge(mgr.piper.type ?? "manager", "#3b82f615", "#3b82f6")}
           </div>
-        </div>
-      `)}
 
-      ${managers.length === 0 ? html`
-        <!-- No manager — show workers as standalone -->
-        <div style="padding:8px 0 8px 0;margin-bottom:8px">
-          <span style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600">Available Workers</span>
-        </div>
-        <div style="display:grid;gap:6px;margin-bottom:24px">
-          ${workers.map((w) => workerNode(w))}
-          ${[...taskSkills.entries()].map(([name, count]) => unregNode(name, count))}
-        </div>
-      ` : nothing}
+          <!-- Connector + Workers -->
+          <div style="margin-left:28px;border-left:2px solid var(--border);padding-left:20px;margin-bottom:24px">
+            <div style="display:grid;gap:6px;padding-top:6px">
+              ${mgrWorkers.map((w) => workerNode(w))}
+              ${mgrUnreg.map(([name, count]) => unregNode(name, count))}
+              ${missingWorkers.map((name) => html`
+                <div style="${nodeBase};${unregBorder}">
+                  <span style="font-size:18px">⚠️</span>
+                  <div style="flex:1">
+                    <div style="font-weight:600;font-size:13px">${name}</div>
+                    <div style="font-size:11px;color:var(--text-secondary)">Declared but skill not found</div>
+                  </div>
+                  ${badge("missing", "#ef444415", "#ef4444")}
+                </div>
+              `)}
+              ${mgrWorkerNames.size === 0 ? html`
+                <div style="padding:8px 0;color:var(--text-muted);font-size:12px;font-style:italic">
+                  No workers declared. Add <code>"workers": ["skill-name"]</code> to this manager's piper metadata.
+                </div>
+              ` : nothing}
+            </div>
+          </div>
+        `;
+      })}
+
+      ${(() => {
+        // Workers not assigned to any manager
+        const allMgrWorkers = new Set(managers.flatMap((m) => m.piper.workers ?? []));
+        const unassignedWorkers = workers.filter((w) => !allMgrWorkers.has(w.name));
+        const unassignedUnreg = [...taskSkills.entries()].filter(([name]) => !allMgrWorkers.has(name));
+        if (unassignedWorkers.length === 0 && unassignedUnreg.length === 0) return nothing;
+        return html`
+          <div style="padding:8px 0 8px 0;margin-bottom:8px;margin-top:8px">
+            <span style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600">Unassigned Workers</span>
+          </div>
+          <div style="display:grid;gap:6px;margin-bottom:24px">
+            ${unassignedWorkers.map((w) => workerNode(w))}
+            ${unassignedUnreg.map(([name, count]) => unregNode(name, count))}
+          </div>
+        `;
+      })()}
     `;
   }
 }

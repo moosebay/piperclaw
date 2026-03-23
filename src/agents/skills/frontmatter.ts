@@ -209,6 +209,11 @@ export function resolveOpenClawMetadata(
             typeof (piperRaw as Record<string, unknown>).description === "string"
               ? ((piperRaw as Record<string, unknown>).description as string)
               : undefined,
+          workers: Array.isArray((piperRaw as Record<string, unknown>).workers)
+            ? ((piperRaw as Record<string, unknown>).workers as string[]).filter(
+                (w) => typeof w === "string",
+              )
+            : undefined,
         }
       : undefined;
 

@@ -109,6 +109,7 @@ export type PiperSkill = {
     role: "manager" | "worker";
     type?: string;
     description?: string;
+    workers?: string[];
   };
 };
 

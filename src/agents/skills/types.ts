@@ -25,6 +25,8 @@ export type PiperSkillMetadata = {
   type?: string;
   /** Short description of what this skill does in the Piper context. */
   description?: string;
+  /** Worker skill names this manager uses. Only relevant for managers. */
+  workers?: string[];
 };
 
 export type OpenClawSkillMetadata = {
