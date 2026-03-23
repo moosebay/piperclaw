@@ -57,6 +57,8 @@ import type {
   PluginHookTaskReadyEvent,
   PluginHookTaskCompletedEvent,
   PluginHookTaskFailedEvent,
+  PluginHookTaskWaitingEvent,
+  PluginHookTaskResumedEvent,
   PluginHookObjectiveCompletedEvent,
 } from "./types.js";
 
@@ -109,6 +111,8 @@ export type {
   PluginHookTaskReadyEvent,
   PluginHookTaskCompletedEvent,
   PluginHookTaskFailedEvent,
+  PluginHookTaskWaitingEvent,
+  PluginHookTaskResumedEvent,
   PluginHookObjectiveCompletedEvent,
 };
 
@@ -935,6 +939,20 @@ export function createHookRunner(registry: PluginRegistry, options: HookRunnerOp
     return runVoidHook("task_failed", event, ctx);
   }
 
+  async function runTaskWaiting(
+    event: PluginHookTaskWaitingEvent,
+    ctx: PluginHookTaskContext,
+  ): Promise<void> {
+    return runVoidHook("task_waiting", event, ctx);
+  }
+
+  async function runTaskResumed(
+    event: PluginHookTaskResumedEvent,
+    ctx: PluginHookTaskContext,
+  ): Promise<void> {
+    return runVoidHook("task_resumed", event, ctx);
+  }
+
   async function runObjectiveCompleted(
     event: PluginHookObjectiveCompletedEvent,
     ctx: PluginHookTaskContext,
@@ -998,6 +1016,8 @@ export function createHookRunner(registry: PluginRegistry, options: HookRunnerOp
     runTaskReady,
     runTaskCompleted,
     runTaskFailed,
+    runTaskWaiting,
+    runTaskResumed,
     runObjectiveCompleted,
     // Utility
     hasHooks,

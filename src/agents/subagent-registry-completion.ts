@@ -15,9 +15,10 @@ async function notifyTaskCompletionFromSubagentSafe(
   runId: string,
   outcome: string | undefined,
   error: string | undefined,
+  frozenResultText?: string,
 ): Promise<void> {
   try {
-    await notifyTaskCompletionFromSubagent(runId, outcome, error);
+    await notifyTaskCompletionFromSubagent(runId, outcome, error, frozenResultText);
   } catch {
     // Task service may not be running — safe to ignore
   }
@@ -102,7 +103,12 @@ export async function emitSubagentEndedHookOnce(params: {
     params.persist();
 
     // If this subagent was spawned for a task, notify the task service
-    void notifyTaskCompletionFromSubagentSafe(params.entry.runId, params.outcome, params.error);
+    void notifyTaskCompletionFromSubagentSafe(
+      params.entry.runId,
+      params.outcome,
+      params.error,
+      params.entry.frozenResultText ?? undefined,
+    );
 
     return true;
   } catch {

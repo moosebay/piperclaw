@@ -1,5 +1,6 @@
+import { buildStepContext } from "./steps.js";
 import type { TaskStore } from "./store.js";
-import type { ManagerWakeReason, TaskRecord } from "./types.js";
+import type { ManagerWakeReason, TaskRecord, TaskStep } from "./types.js";
 
 /**
  * Build context string for manager re-invocation based on trigger reason.
@@ -155,6 +156,84 @@ export function buildWorkerPrompt(task: TaskRecord, depReportSummaries: string[]
     );
     sections.push("");
   }
+  sections.push(
+    "When done, produce a report summarizing what you did using the report tool " +
+      "(pass the taskId above). Do not create new tasks.",
+  );
+
+  return sections.join("\n");
+}
+
+/**
+ * Build worker prompt for a resumed (previously suspended) task.
+ * Includes all prior step checkpoint results so the new subagent
+ * can pick up where the previous run left off.
+ */
+export function buildResumedWorkerPrompt(
+  task: TaskRecord,
+  depReportSummaries: string[],
+  steps: TaskStep[],
+  resumeEventData?: unknown,
+): string {
+  const sections: string[] = [];
+
+  sections.push(`# Task: ${task.title}`);
+  sections.push(`Task ID: ${task.id}`);
+  if (task.description) {
+    sections.push("");
+    sections.push(task.description);
+  }
+
+  // Serialize all metadata as key-value pairs so the skill can use them
+  if (task.metadata && Object.keys(task.metadata).length > 0) {
+    sections.push("");
+    sections.push("## Task metadata");
+    for (const [key, value] of Object.entries(task.metadata)) {
+      const display = typeof value === "string" ? value : JSON.stringify(value);
+      sections.push(`${key}: ${display}`);
+    }
+  }
+
+  if (depReportSummaries.length > 0) {
+    sections.push("");
+    sections.push("## Context from prior tasks:");
+    for (const summary of depReportSummaries) {
+      sections.push(`- ${summary}`);
+    }
+  }
+
+  // Inject step checkpoint context from prior run
+  const stepContext = buildStepContext(steps);
+  if (stepContext) {
+    sections.push("");
+    sections.push(stepContext);
+  }
+
+  // Inject resume event data if present
+  if (resumeEventData !== undefined && resumeEventData !== null) {
+    sections.push("");
+    sections.push("## Resume event data");
+    const display =
+      typeof resumeEventData === "string" ? resumeEventData : JSON.stringify(resumeEventData);
+    sections.push(display);
+  }
+
+  sections.push("");
+  sections.push("## Instructions");
+  sections.push("");
+  if (task.assignedSkill) {
+    sections.push(`You are assigned skill: ${task.assignedSkill}`);
+    sections.push(
+      "Execute this task using the skill's full procedures. " +
+        "The metadata above provides parameters and context for this run.",
+    );
+    sections.push("");
+  }
+  sections.push(
+    "You are resuming a previously suspended task. The steps above were " +
+      "completed in a prior run. Continue from where you left off.",
+  );
+  sections.push("");
   sections.push(
     "When done, produce a report summarizing what you did using the report tool " +
       "(pass the taskId above). Do not create new tasks.",

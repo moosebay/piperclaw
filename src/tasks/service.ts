@@ -168,6 +168,7 @@ export async function notifyTaskCompletionFromSubagent(
   runId: string,
   outcome: string | undefined,
   error: string | undefined,
+  frozenResultText?: string,
 ): Promise<void> {
   if (!defaultService) {
     return;
@@ -186,6 +187,27 @@ export async function notifyTaskCompletionFromSubagent(
   if (!completed) {
     return;
   } // Stale — already handled
+
+  // Fallback report capture: if worker completed without calling the report
+  // tool and frozenResultText is available, auto-create a report so output
+  // is not lost.
+  if (status === "completed" && frozenResultText?.trim()) {
+    const existing = store.getReportByTask(task.id);
+    if (!existing) {
+      try {
+        store.createReport({
+          taskId: task.id,
+          title: `Auto-captured: ${task.title}`,
+          summary: frozenResultText.trim().slice(0, 300),
+          content: frozenResultText,
+          format: "markdown",
+          metadata: { source: "fallback-capture" },
+        });
+      } catch {
+        log.warn(`Failed to create fallback report for task ${task.id}`);
+      }
+    }
+  }
 
   await dispatcher.handleTaskCompletion(task.id);
 }

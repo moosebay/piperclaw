@@ -1428,6 +1428,8 @@ export type PluginHookName =
   | "task_ready"
   | "task_completed"
   | "task_failed"
+  | "task_waiting"
+  | "task_resumed"
   | "objective_completed";
 
 export const PLUGIN_HOOK_NAMES = [
@@ -1459,6 +1461,8 @@ export const PLUGIN_HOOK_NAMES = [
   "task_ready",
   "task_completed",
   "task_failed",
+  "task_waiting",
+  "task_resumed",
   "objective_completed",
 ] as const satisfies readonly PluginHookName[];
 
@@ -1936,6 +1940,22 @@ export type PluginHookTaskFailedEvent = {
   retriesExhausted: boolean;
 };
 
+// task_waiting hook — fired when a task suspends to wait for an external event
+export type PluginHookTaskWaitingEvent = {
+  taskId: string;
+  title: string;
+  eventName: string;
+  timeoutAt?: number;
+};
+
+// task_resumed hook — fired when a waiting task is resumed by an event
+export type PluginHookTaskResumedEvent = {
+  taskId: string;
+  title: string;
+  eventName: string;
+  eventData?: unknown;
+};
+
 // objective_completed hook
 export type PluginHookObjectiveCompletedEvent = {
   objectiveId: string;
@@ -2054,6 +2074,14 @@ export type PluginHookHandlerMap = {
   ) => Promise<void> | void;
   task_failed: (
     event: PluginHookTaskFailedEvent,
+    ctx: PluginHookTaskContext,
+  ) => Promise<void> | void;
+  task_waiting: (
+    event: PluginHookTaskWaitingEvent,
+    ctx: PluginHookTaskContext,
+  ) => Promise<void> | void;
+  task_resumed: (
+    event: PluginHookTaskResumedEvent,
     ctx: PluginHookTaskContext,
   ) => Promise<void> | void;
   objective_completed: (

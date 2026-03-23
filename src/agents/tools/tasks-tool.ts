@@ -64,6 +64,7 @@ const TasksToolSchema = Type.Object(
       "scheduled",
       "ready",
       "running",
+      "waiting",
       "failed",
     ] as const),
     // Update fields

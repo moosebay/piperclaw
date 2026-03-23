@@ -41,6 +41,7 @@ export type TaskStatus =
   | "scheduled"
   | "ready"
   | "running"
+  | "waiting"
   | "completed"
   | "failed"
   | "cancelled";
@@ -103,10 +104,26 @@ export const LEGAL_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   pending: ["ready", "scheduled", "cancelled"],
   scheduled: ["ready", "cancelled"],
   ready: ["running", "cancelled"],
-  running: ["completed", "failed"],
+  running: ["completed", "failed", "waiting"],
+  waiting: ["running", "failed", "cancelled"],
   failed: ["pending"],
   completed: [],
   cancelled: [],
+};
+
+// --- Steps (durable checkpoints) ---
+
+export type TaskStepStatus = "completed" | "failed";
+
+export type TaskStep = {
+  id: string;
+  taskId: string;
+  stepName: string;
+  stepIndex: number;
+  status: TaskStepStatus;
+  result?: unknown;
+  createdAt: number;
+  completedAt?: number;
 };
 
 // --- Reports ---
@@ -150,6 +167,7 @@ export type ObjectiveProgress = {
   scheduled: number;
   ready: number;
   running: number;
+  waiting: number;
   completed: number;
   failed: number;
   cancelled: number;

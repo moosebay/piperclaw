@@ -16,6 +16,7 @@ import type {
   TaskFilter,
   TaskRecord,
   TaskStatus,
+  TaskStep,
 } from "./types.js";
 
 type SqlParam = string | number | null;
@@ -96,6 +97,19 @@ CREATE TABLE IF NOT EXISTS reports (
   FOREIGN KEY (objective_id) REFERENCES objectives(id)
 );
 
+CREATE TABLE IF NOT EXISTS task_steps (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL,
+  step_name TEXT NOT NULL,
+  step_index INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'completed',
+  result TEXT,
+  created_at INTEGER NOT NULL,
+  completed_at INTEGER,
+  FOREIGN KEY (task_id) REFERENCES tasks(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_steps_task ON task_steps(task_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_scheduled ON tasks(scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_agent ON tasks(agent_id);
@@ -172,6 +186,17 @@ type ReportRow = {
   metadata: string | null;
 };
 
+type TaskStepRow = {
+  id: string;
+  task_id: string;
+  step_name: string;
+  step_index: number;
+  status: string;
+  result: string | null;
+  created_at: number;
+  completed_at: number | null;
+};
+
 // ---------------------------------------------------------------------------
 // Row → Record helpers
 // ---------------------------------------------------------------------------
@@ -238,6 +263,19 @@ function reportFromRow(row: ReportRow): ReportRecord {
     format: row.format as ReportRecord["format"],
     createdAt: row.created_at,
     metadata: row.metadata ? (JSON.parse(row.metadata) as Record<string, unknown>) : undefined,
+  };
+}
+
+function stepFromRow(row: TaskStepRow): TaskStep {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    stepName: row.step_name,
+    stepIndex: row.step_index,
+    status: row.status as TaskStep["status"],
+    result: row.result ? JSON.parse(row.result) : undefined,
+    createdAt: row.created_at,
+    completedAt: row.completed_at ?? undefined,
   };
 }
 
@@ -389,6 +427,7 @@ export class TaskStore {
       scheduled: 0,
       ready: 0,
       running: 0,
+      waiting: 0,
       completed: 0,
       failed: 0,
       cancelled: 0,
@@ -842,5 +881,49 @@ export class TaskStore {
     this.db
       .prepare("UPDATE tasks SET report_id = ?, updated_at = ? WHERE id = ?")
       .run(reportId, Date.now(), taskId);
+  }
+
+  // -------------------------------------------------------------------------
+  // Steps (durable checkpoints)
+  // -------------------------------------------------------------------------
+
+  /** Insert a completed step checkpoint. Auto-increments stepIndex based on existing step count. */
+  addStep(taskId: string, stepName: string, result?: unknown): string {
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    const stepIndex = this.getStepCount(taskId);
+
+    this.db
+      .prepare(
+        `INSERT INTO task_steps (id, task_id, step_name, step_index, status, result, created_at, completed_at)
+         VALUES (?, ?, ?, ?, 'completed', ?, ?, ?)`,
+      )
+      .run(
+        id,
+        taskId,
+        stepName,
+        stepIndex,
+        result !== undefined ? JSON.stringify(result) : null,
+        now,
+        now,
+      );
+
+    return id;
+  }
+
+  /** Get all steps for a task ordered by step_index ascending. */
+  getSteps(taskId: string): TaskStep[] {
+    const rows = this.db
+      .prepare("SELECT * FROM task_steps WHERE task_id = ? ORDER BY step_index ASC")
+      .all(taskId) as TaskStepRow[];
+    return rows.map(stepFromRow);
+  }
+
+  /** Count the number of steps recorded for a task. */
+  getStepCount(taskId: string): number {
+    const row = this.db
+      .prepare("SELECT COUNT(*) as cnt FROM task_steps WHERE task_id = ?")
+      .get(taskId) as { cnt: number };
+    return row.cnt;
   }
 }

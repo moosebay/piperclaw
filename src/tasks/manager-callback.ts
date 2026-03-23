@@ -41,7 +41,8 @@ export function shouldWakeManager(task: TaskRecord, store: TaskStore): ManagerWa
     progress.pending === 0 &&
     progress.running === 0 &&
     progress.ready === 0 &&
-    progress.scheduled === 0
+    progress.scheduled === 0 &&
+    progress.waiting === 0
   ) {
     return { reason: "objective_completed", objectiveId: task.objectiveId };
   }
