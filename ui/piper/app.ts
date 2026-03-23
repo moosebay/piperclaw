@@ -200,8 +200,8 @@ export class PiperApp extends LitElement {
     const client = new GatewayBrowserClient({
       url: wsUrl,
       token,
-      mode: "ui" as any,
-      clientName: "piper" as any,
+      mode: "ui",
+      clientName: "openclaw-control-ui",
       onHello: (hello) => {
         this.hello = hello;
         this.connected = true;
