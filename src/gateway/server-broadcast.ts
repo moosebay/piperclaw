@@ -19,6 +19,8 @@ const EVENT_SCOPE_GUARDS: Record<string, string[]> = {
   "sessions.changed": [READ_SCOPE],
   "session.message": [READ_SCOPE],
   "session.tool": [READ_SCOPE],
+  "task.status": [READ_SCOPE],
+  "objective.progress": [READ_SCOPE],
 };
 
 export type GatewayBroadcastStateVersion = {

@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { addValidatedDependency } from "../tasks/deps.js";
-import { getTaskStore } from "../tasks/service.runtime.js";
+import { approveTask, rejectTask } from "../tasks/hitl.js";
+import { getTaskStore, resumeTaskFromEvent } from "../tasks/service.runtime.js";
 import { TaskStore } from "../tasks/store.js";
 import type { ObjectiveFilter, ObjectiveStatus, TaskFilter, TaskStatus } from "../tasks/types.js";
 import { registerTasksImportCli } from "./tasks-import-cli.js";
@@ -299,6 +300,98 @@ export function registerTasksCli(program: Command) {
         }
         store.updateTaskStatus(id, "cancelled");
         console.log(`Cancelled task: ${id}`);
+      } finally {
+        closeIfOwned(handle);
+      }
+    });
+
+  tasks
+    .command("approve")
+    .description("Approve a waiting task (HITL)")
+    .argument("<id>", "Task ID")
+    .option("--comment <text>", "Approval comment")
+    .action(async (id: string, opts: { comment?: string }) => {
+      const handle = getStore();
+      try {
+        const store = handle.store;
+        const task = store.getTask(id);
+        if (!task) {
+          console.error(`Task ${id} not found`);
+          process.exitCode = 1;
+          return;
+        }
+        if (task.status !== "waiting") {
+          console.error(`Task ${id} is not waiting (status: ${task.status})`);
+          process.exitCode = 1;
+          return;
+        }
+        const { matched } = approveTask(store, id, "cli-user", opts.comment);
+        if (matched) {
+          console.log(`Approved task: ${id}`);
+          // Resume via the singleton service if it's running
+          void resumeTaskFromEvent(id, {
+            taskId: id,
+            approver: "cli-user",
+            comment: opts.comment,
+          });
+        } else {
+          console.log(`Event emitted but no matching wait condition found for task ${id}`);
+        }
+      } finally {
+        closeIfOwned(handle);
+      }
+    });
+
+  tasks
+    .command("reject")
+    .description("Reject a waiting task (HITL)")
+    .argument("<id>", "Task ID")
+    .option("--reason <text>", "Rejection reason")
+    .action(async (id: string, opts: { reason?: string }) => {
+      const handle = getStore();
+      try {
+        const store = handle.store;
+        const task = store.getTask(id);
+        if (!task) {
+          console.error(`Task ${id} not found`);
+          process.exitCode = 1;
+          return;
+        }
+        if (task.status !== "waiting") {
+          console.error(`Task ${id} is not waiting (status: ${task.status})`);
+          process.exitCode = 1;
+          return;
+        }
+        rejectTask(store, id, "cli-user", opts.reason);
+        store.updateTaskStatus(id, "failed");
+        console.log(`Rejected task: ${id}`);
+      } finally {
+        closeIfOwned(handle);
+      }
+    });
+
+  tasks
+    .command("waiting")
+    .description("List tasks waiting for approval/events")
+    .option("--json", "Output JSON", false)
+    .action(async (opts: { json?: boolean }) => {
+      const handle = getStore();
+      try {
+        const store = handle.store;
+        const results = store.listTasks({ status: "waiting" as TaskStatus });
+        if (opts.json) {
+          console.log(JSON.stringify(results, null, 2));
+        } else {
+          if (results.length === 0) {
+            console.log("No waiting tasks.");
+            return;
+          }
+          for (const t of results) {
+            const wait = store.getWaitConditionForTask(t.id);
+            const eventInfo = wait ? ` (waiting for: ${wait.eventName})` : "";
+            console.log(`${t.id}  ${t.title}${eventInfo}`);
+          }
+        }
       } finally {
         closeIfOwned(handle);
       }

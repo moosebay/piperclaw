@@ -22,6 +22,10 @@ export type TaskServiceConfig = {
   spawnWorker?: (task: TaskRecord, depReportSummaries: string[]) => Promise<string | undefined>;
   /** Callback to re-invoke the manager with context. */
   onManagerWake?: (objectiveId: string, reason: string, context: string) => Promise<void>;
+  /** Optional WS broadcast for dashboard events. */
+  broadcast?: (event: string, payload: unknown) => void;
+  /** Callback for task notifications (objective complete, task failed, etc.). */
+  onNotify?: (text: string, metadata?: Record<string, unknown>) => Promise<void>;
 };
 
 // ---------------------------------------------------------------------------
@@ -88,6 +92,8 @@ export class TaskService {
       taskTimeoutMs: config.taskTimeoutMs,
       spawnWorker,
       onManagerWake,
+      broadcast: config.broadcast,
+      onNotify: config.onNotify,
     });
   }
 

@@ -1018,7 +1018,17 @@ export async function startGatewayServer(
   if (!minimalTestGateway) {
     try {
       const { startTaskService } = await import("../tasks/service.js");
-      taskService = startTaskService();
+      const { resolveNotificationConfig, sendTaskNotification } =
+        await import("../tasks/notifications.js");
+      taskService = startTaskService({
+        broadcast,
+        onNotify: async (text, metadata) => {
+          const notifConfig = resolveNotificationConfig(metadata);
+          if (notifConfig) {
+            await sendTaskNotification(notifConfig, text);
+          }
+        },
+      });
     } catch (err) {
       log.warn(`task service failed to start: ${String(err)}`);
     }

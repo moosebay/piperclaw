@@ -3,6 +3,7 @@ import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import { resolveDependents } from "./deps.js";
 import { taskLog as log } from "./log.js";
 import { shouldWakeManager } from "./manager-callback.js";
+import { formatObjectiveCompleted, formatTaskFailed } from "./notifications.js";
 import { buildManagerContext } from "./reports.js";
 import type { TaskStore } from "./store.js";
 import type { TaskRecord } from "./types.js";
@@ -24,6 +25,10 @@ export type DispatcherConfig = {
   spawnWorker: (task: TaskRecord, depReportSummaries: string[]) => Promise<string | undefined>;
   /** Callback to re-invoke the manager with context. */
   onManagerWake: (objectiveId: string, reason: string, context: string) => Promise<void>;
+  /** Optional WS broadcast for dashboard events. */
+  broadcast?: (event: string, payload: unknown) => void;
+  /** Callback for task notifications (objective complete, task failed, etc.). */
+  onNotify?: (text: string, metadata?: Record<string, unknown>) => Promise<void>;
 };
 
 const DEFAULT_CONFIG: Omit<DispatcherConfig, "spawnWorker" | "onManagerWake"> = {
@@ -245,6 +250,13 @@ export class TaskDispatcher {
         taskCtx,
       );
 
+      // Broadcast task status change to dashboard clients
+      this.config.broadcast?.("task.status", {
+        taskId: task.id,
+        status: "failed",
+        objectiveId: task.objectiveId,
+      });
+
       // Check retry
       if (task.retryCount < task.maxRetries) {
         try {
@@ -266,6 +278,13 @@ export class TaskDispatcher {
         { taskId: task.id, title: task.title, reportId: task.reportId },
         taskCtx,
       );
+
+      // Broadcast task status change to dashboard clients
+      this.config.broadcast?.("task.status", {
+        taskId: task.id,
+        status: "completed",
+        objectiveId: task.objectiveId,
+      });
 
       // Resolve dependents
       const promoted = resolveDependents(taskId, this.store);
@@ -312,6 +331,12 @@ export class TaskDispatcher {
             taskCtx,
           );
         }
+
+        // Broadcast objective progress to dashboard clients
+        this.config.broadcast?.("objective.progress", {
+          objectiveId: task.objectiveId,
+          ...progress,
+        });
       }
 
       try {
@@ -319,6 +344,24 @@ export class TaskDispatcher {
         await this.config.onManagerWake(task.objectiveId, wakeReason.reason, context);
       } catch (err) {
         log.error(`[task-dispatcher] Manager re-invocation failed: ${String(err)}`);
+      }
+    }
+
+    // Send outbound notifications (fire-and-forget)
+    if (this.config.onNotify) {
+      if (wakeReason?.reason === "objective_completed") {
+        const obj = this.store.getObjective(task.objectiveId);
+        if (obj) {
+          const prog = this.store.getObjectiveProgress(task.objectiveId);
+          void this.config.onNotify(
+            formatObjectiveCompleted(obj.title, prog.completed, prog.total),
+            obj.metadata,
+          );
+        }
+      }
+      if (task.status === "failed" && task.retryCount >= task.maxRetries) {
+        const obj = this.store.getObjective(task.objectiveId);
+        void this.config.onNotify(formatTaskFailed(task.title, task.error), obj?.metadata);
       }
     }
 

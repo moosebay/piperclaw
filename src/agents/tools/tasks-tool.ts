@@ -1,6 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { addValidatedDependency } from "../../tasks/deps.js";
-import { getTaskStore, nudgeDispatcher } from "../../tasks/service.runtime.js";
+import { approveTask, rejectTask } from "../../tasks/hitl.js";
+import { getTaskStore, nudgeDispatcher, resumeTaskFromEvent } from "../../tasks/service.runtime.js";
 import type {
   CreateObjectiveParams,
   CreateTaskParams,
@@ -28,6 +29,8 @@ const TASK_ACTIONS = [
   "tasks.get",
   "tasks.cancel",
   "tasks.update",
+  "tasks.approve",
+  "tasks.reject",
   "reports.get",
   "reports.list",
 ] as const;
@@ -116,6 +119,8 @@ Tasks:
 - tasks.get: Get task details with report summary (requires id)
 - tasks.cancel: Cancel a pending/scheduled/ready task (requires id)
 - tasks.update: Update description/metadata of a pending task (requires id)
+- tasks.approve: Approve a waiting task (HITL) (requires id; optional: description for comment)
+- tasks.reject: Reject a waiting task (HITL) (requires id; optional: description for reason)
 
 Reports:
 - reports.get: Get full report content (requires reportId)
@@ -309,6 +314,32 @@ Reports:
             priority: typeof params.priority === "number" ? params.priority : undefined,
           });
           return jsonResult({ id, status: "updated" });
+        }
+
+        // -----------------------------------------------------------------
+        // HITL (approve / reject)
+        // -----------------------------------------------------------------
+        case "tasks.approve": {
+          const id = readStringParam(params, "id", { required: true });
+          const comment = typeof params.description === "string" ? params.description : undefined;
+          const { matched } = approveTask(store, id, undefined, comment);
+          if (matched) {
+            // Resume the task with approval context
+            void resumeTaskFromEvent(id, { taskId: id, approver: "agent", comment });
+            nudgeDispatcher();
+          }
+          return jsonResult({ id, approved: true, matched });
+        }
+
+        case "tasks.reject": {
+          const id = readStringParam(params, "id", { required: true });
+          const reason = typeof params.description === "string" ? params.description : undefined;
+          const { matched } = rejectTask(store, id, undefined, reason);
+          if (matched) {
+            // Transition task to failed
+            store.updateTaskStatus(id, "failed");
+          }
+          return jsonResult({ id, rejected: true, matched });
         }
 
         // -----------------------------------------------------------------
