@@ -1,7 +1,7 @@
 import { spawnSubagentDirect } from "../agents/subagent-spawn.js";
 import { TaskDispatcher } from "./dispatcher.js";
 import { taskLog as log } from "./log.js";
-import { buildWorkerPrompt } from "./reports.js";
+import { buildResumedWorkerPrompt, buildWorkerPrompt } from "./reports.js";
 import { TaskStore } from "./store.js";
 import type { TaskRecord } from "./types.js";
 
@@ -106,6 +106,69 @@ export class TaskService {
     this.dispatcher.nudge();
   }
 
+  /**
+   * Resume a waiting task by spawning a new subagent with full context
+   * (prior step results + resume event data).
+   */
+  async resumeTask(taskId: string, eventData?: unknown): Promise<void> {
+    const task = this.store.getTask(taskId);
+    if (!task || task.status !== "waiting") {
+      return;
+    }
+
+    // Get prior steps for context injection
+    const steps = this.store.getSteps(taskId);
+
+    // Transition waiting -> running
+    this.store.updateTaskStatus(taskId, "running");
+
+    // Build resumed prompt with all prior context
+    const depSummaries = this.getDepReportSummaries(task);
+    const prompt = buildResumedWorkerPrompt(task, depSummaries, steps, eventData);
+
+    // Spawn new subagent with full context
+    try {
+      const result = await spawnSubagentDirect(
+        {
+          task: prompt,
+          label: `task:${task.id}:resumed`,
+          agentId: task.assignedAgentId ?? task.agentId,
+          mode: "run",
+          cleanup: "delete",
+          runTimeoutSeconds: (task.metadata?.timeoutSeconds as number) ?? 600,
+          expectsCompletionMessage: false,
+        },
+        { requesterAgentIdOverride: task.agentId },
+      );
+
+      if (result.status !== "accepted") {
+        this.store.updateTaskStatus(taskId, "failed");
+        return;
+      }
+
+      // Update runId to match new subagent
+      if (result.runId) {
+        this.store.updateRunId(taskId, task.runId ?? "", result.runId);
+      }
+    } catch (err) {
+      log.error(`[task-service] Resume spawn failed for task ${taskId}: ${String(err)}`);
+      this.store.updateTaskStatus(taskId, "failed");
+    }
+  }
+
+  /** Build dependency report summaries for a task. */
+  private getDepReportSummaries(task: TaskRecord): string[] {
+    const deps = task.dependsOn ?? [];
+    const summaries: string[] = [];
+    for (const depId of deps) {
+      const report = this.store.getReportByTask(depId);
+      if (report) {
+        summaries.push(`[${report.title}]: ${report.summary}`);
+      }
+    }
+    return summaries;
+  }
+
   async notifyTaskCompletion(
     taskId: string,
     runId: string,
@@ -161,6 +224,17 @@ export function nudgeDispatcher(): void {
 }
 
 /**
+ * Resume a waiting task by spawning a new subagent with full context.
+ * Called from the notify tool when an event matches a wait condition.
+ */
+export async function resumeTaskFromEvent(taskId: string, eventData?: unknown): Promise<void> {
+  if (!defaultService) {
+    return;
+  }
+  await defaultService.resumeTask(taskId, eventData);
+}
+
+/**
  * Called from subagent_ended hook. Looks up a running task by its subagent
  * runId and completes it based on the subagent outcome.
  */
@@ -179,6 +253,11 @@ export async function notifyTaskCompletionFromSubagent(
   if (!task) {
     return;
   } // Not a task-managed subagent
+
+  // Task voluntarily suspended itself via waitForEvent — don't mark complete
+  if (task.status === "waiting") {
+    return;
+  }
 
   const status = outcome === "ok" ? "completed" : "failed";
   const errorMsg = status === "failed" ? (error ?? `subagent ended: ${outcome}`) : undefined;

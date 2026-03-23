@@ -16,6 +16,7 @@ import { createImageGenerateTool } from "./tools/image-generate-tool.js";
 import { createImageTool } from "./tools/image-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
+import { createNotifyTool } from "./tools/notify-tool.js";
 import { createPdfTool } from "./tools/pdf-tool.js";
 import { createReportTool } from "./tools/report-tool.js";
 import { createSessionStatusTool } from "./tools/session-status-tool.js";
@@ -27,6 +28,7 @@ import { createSessionsYieldTool } from "./tools/sessions-yield-tool.js";
 import { createSubagentsTool } from "./tools/subagents-tool.js";
 import { createTasksTool } from "./tools/tasks-tool.js";
 import { createTtsTool } from "./tools/tts-tool.js";
+import { createWaitEventTool } from "./tools/wait-event-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 import { resolveWorkspaceRoot } from "./workspace-dir.js";
 
@@ -236,6 +238,8 @@ export function createOpenClawTools(
       }),
     }),
     createReportTool(),
+    createWaitEventTool(),
+    createNotifyTool(),
   ];
 
   const pluginTools = resolvePluginTools({

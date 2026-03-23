@@ -13,10 +13,12 @@ import type {
   ObjectiveRecord,
   ObjectiveStatus,
   ReportRecord,
+  TaskEvent,
   TaskFilter,
   TaskRecord,
   TaskStatus,
   TaskStep,
+  WaitCondition,
 } from "./types.js";
 
 type SqlParam = string | number | null;
@@ -110,6 +112,32 @@ CREATE TABLE IF NOT EXISTS task_steps (
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_steps_task ON task_steps(task_id);
+
+CREATE TABLE IF NOT EXISTS task_events (
+  id TEXT PRIMARY KEY,
+  event_name TEXT NOT NULL,
+  data TEXT,
+  created_at INTEGER NOT NULL,
+  consumed_by_task_id TEXT,
+  expires_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_task_events_name ON task_events(event_name);
+CREATE INDEX IF NOT EXISTS idx_task_events_unconsumed ON task_events(event_name, consumed_by_task_id)
+  WHERE consumed_by_task_id IS NULL;
+
+CREATE TABLE IF NOT EXISTS task_wait_conditions (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL,
+  event_name TEXT NOT NULL,
+  filter TEXT,
+  timeout_at INTEGER,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (task_id) REFERENCES tasks(id)
+);
+CREATE INDEX IF NOT EXISTS idx_task_waits_event ON task_wait_conditions(event_name);
+CREATE INDEX IF NOT EXISTS idx_task_waits_timeout ON task_wait_conditions(timeout_at)
+  WHERE timeout_at IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_scheduled ON tasks(scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_agent ON tasks(agent_id);
@@ -197,6 +225,24 @@ type TaskStepRow = {
   completed_at: number | null;
 };
 
+type TaskEventRow = {
+  id: string;
+  event_name: string;
+  data: string | null;
+  created_at: number;
+  consumed_by_task_id: string | null;
+  expires_at: number | null;
+};
+
+type WaitConditionRow = {
+  id: string;
+  task_id: string;
+  event_name: string;
+  filter: string | null;
+  timeout_at: number | null;
+  created_at: number;
+};
+
 // ---------------------------------------------------------------------------
 // Row → Record helpers
 // ---------------------------------------------------------------------------
@@ -276,6 +322,28 @@ function stepFromRow(row: TaskStepRow): TaskStep {
     result: row.result ? JSON.parse(row.result) : undefined,
     createdAt: row.created_at,
     completedAt: row.completed_at ?? undefined,
+  };
+}
+
+function eventFromRow(row: TaskEventRow): TaskEvent {
+  return {
+    id: row.id,
+    eventName: row.event_name,
+    data: row.data ? JSON.parse(row.data) : undefined,
+    createdAt: row.created_at,
+    consumedByTaskId: row.consumed_by_task_id ?? undefined,
+    expiresAt: row.expires_at ?? undefined,
+  };
+}
+
+function waitConditionFromRow(row: WaitConditionRow): WaitCondition {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    eventName: row.event_name,
+    filter: row.filter ? (JSON.parse(row.filter) as Record<string, unknown>) : undefined,
+    timeoutAt: row.timeout_at ?? undefined,
+    createdAt: row.created_at,
   };
 }
 
@@ -505,10 +573,10 @@ export class TaskStore {
     return taskFromRow(row, deps, dependents);
   }
 
-  /** Find a running task by its subagent runId. */
+  /** Find a task by its subagent runId. Includes running and waiting statuses. */
   getTaskByRunId(runId: string): TaskRecord | undefined {
     const row = this.db
-      .prepare("SELECT * FROM tasks WHERE run_id = ? AND status = 'running'")
+      .prepare("SELECT * FROM tasks WHERE run_id = ? AND status IN ('running', 'waiting')")
       .get(runId) as TaskRow | undefined;
     if (!row) {
       return undefined;
@@ -925,5 +993,117 @@ export class TaskStore {
       .prepare("SELECT COUNT(*) as cnt FROM task_steps WHERE task_id = ?")
       .get(taskId) as { cnt: number };
     return row.cnt;
+  }
+
+  // -------------------------------------------------------------------------
+  // Events (event bus)
+  // -------------------------------------------------------------------------
+
+  /** Insert an event row. Returns the event ID. */
+  insertEvent(eventName: string, data?: unknown, expiresAt?: number): string {
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    this.db
+      .prepare(
+        `INSERT INTO task_events (id, event_name, data, created_at, consumed_by_task_id, expires_at)
+         VALUES (?, ?, ?, ?, NULL, ?)`,
+      )
+      .run(id, eventName, data !== undefined ? JSON.stringify(data) : null, now, expiresAt ?? null);
+    return id;
+  }
+
+  /** Get an event by ID. */
+  getEvent(id: string): TaskEvent | undefined {
+    const row = this.db.prepare("SELECT * FROM task_events WHERE id = ?").get(id) as
+      | TaskEventRow
+      | undefined;
+    return row ? eventFromRow(row) : undefined;
+  }
+
+  /**
+   * Find the first wait condition matching the given event name.
+   * If data is provided and the wait condition has a filter, all filter
+   * key/value pairs must match the corresponding keys in data.
+   */
+  findMatchingWait(
+    eventName: string,
+    data?: unknown,
+  ): { waitCondition: WaitCondition; taskId: string } | null {
+    const rows = this.db
+      .prepare("SELECT * FROM task_wait_conditions WHERE event_name = ? ORDER BY created_at ASC")
+      .all(eventName) as WaitConditionRow[];
+
+    for (const row of rows) {
+      const wc = waitConditionFromRow(row);
+
+      // If wait condition has a filter, verify data contains all filter keys/values
+      if (wc.filter && Object.keys(wc.filter).length > 0) {
+        if (!data || typeof data !== "object") {
+          continue;
+        }
+        const dataObj = data as Record<string, unknown>;
+        let matches = true;
+        for (const [key, value] of Object.entries(wc.filter)) {
+          if (dataObj[key] !== value) {
+            matches = false;
+            break;
+          }
+        }
+        if (!matches) {
+          continue;
+        }
+      }
+
+      return { waitCondition: wc, taskId: wc.taskId };
+    }
+
+    return null;
+  }
+
+  /** Insert a wait condition for a task. Returns the wait condition ID. */
+  insertWaitCondition(
+    taskId: string,
+    eventName: string,
+    filter?: Record<string, unknown>,
+    timeoutAt?: number,
+  ): string {
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    this.db
+      .prepare(
+        `INSERT INTO task_wait_conditions (id, task_id, event_name, filter, timeout_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(id, taskId, eventName, filter ? JSON.stringify(filter) : null, timeoutAt ?? null, now);
+    return id;
+  }
+
+  /** Remove a wait condition by ID. */
+  removeWaitCondition(id: string): void {
+    this.db.prepare("DELETE FROM task_wait_conditions WHERE id = ?").run(id);
+  }
+
+  /** Find wait conditions that have expired (timeout_at < now). */
+  getExpiredWaitConditions(): WaitCondition[] {
+    const now = Date.now();
+    const rows = this.db
+      .prepare("SELECT * FROM task_wait_conditions WHERE timeout_at IS NOT NULL AND timeout_at < ?")
+      .all(now) as WaitConditionRow[];
+    return rows.map(waitConditionFromRow);
+  }
+
+  /** Mark an event as consumed by a task. */
+  consumeEvent(eventId: string, taskId: string): void {
+    this.db
+      .prepare("UPDATE task_events SET consumed_by_task_id = ? WHERE id = ?")
+      .run(taskId, eventId);
+  }
+
+  /** Get the active wait condition for a task (if any). */
+  getWaitConditionForTask(taskId: string): WaitCondition | null {
+    const row = this.db
+      .prepare("SELECT * FROM task_wait_conditions WHERE task_id = ? LIMIT 1")
+      .get(taskId) as WaitConditionRow | undefined;
+    return row ? waitConditionFromRow(row) : null;
   }
 }

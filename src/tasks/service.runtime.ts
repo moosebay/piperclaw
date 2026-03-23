@@ -7,6 +7,7 @@ export {
   getTaskStore,
   getTaskDispatcher,
   nudgeDispatcher,
+  resumeTaskFromEvent,
   startTaskService,
   stopTaskService,
   notifyTaskCompletionFromSubagent,

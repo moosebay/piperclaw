@@ -173,6 +173,26 @@ export type ObjectiveProgress = {
   cancelled: number;
 };
 
+// --- Events (event bus) ---
+
+export type TaskEvent = {
+  id: string;
+  eventName: string;
+  data?: unknown;
+  createdAt: number;
+  consumedByTaskId?: string;
+  expiresAt?: number;
+};
+
+export type WaitCondition = {
+  id: string;
+  taskId: string;
+  eventName: string;
+  filter?: Record<string, unknown>;
+  timeoutAt?: number;
+  createdAt: number;
+};
+
 // --- Task Filter ---
 
 export type TaskFilter = {

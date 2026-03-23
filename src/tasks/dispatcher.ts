@@ -115,9 +115,10 @@ export class TaskDispatcher {
     try {
       this.tickCount++;
 
-      // Stuck task sweep every N ticks
+      // Stuck task sweep + expired wait conditions every N ticks
       if (this.tickCount % this.config.stuckSweepEveryNTicks === 0) {
         await this.sweepStuckTasks();
+        await this.sweepExpiredWaits();
       }
 
       // Get ready tasks (pure query — no side-effecting promotion)
@@ -347,6 +348,25 @@ export class TaskDispatcher {
           `[task-dispatcher] Task ${task.id} timed out after ${this.config.taskTimeoutMs}ms`,
         );
         await this.handleTaskCompletion(task.id);
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Expired wait condition sweep
+  // -------------------------------------------------------------------------
+
+  private async sweepExpiredWaits(): Promise<void> {
+    const expired = this.store.getExpiredWaitConditions();
+    for (const wait of expired) {
+      this.store.removeWaitCondition(wait.id);
+      const task = this.store.getTask(wait.taskId);
+      if (task?.status === "waiting") {
+        this.store.updateTaskStatus(wait.taskId, "failed");
+        log.warn(
+          `[task-dispatcher] Wait condition expired for task ${wait.taskId} (event: ${wait.eventName})`,
+        );
+        await this.handleTaskCompletion(wait.taskId);
       }
     }
   }
