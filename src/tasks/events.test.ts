@@ -54,7 +54,8 @@ describe("event bus", () => {
 
     it("matches a waiting task and consumes the event", () => {
       const taskId = createWaitingTask();
-      registerWaitCondition(store, taskId, "approval");
+      const reg = registerWaitCondition(store, taskId, "approval");
+      expect(reg.matched).toBe(false);
 
       const result = emitEvent(store, "approval", { approved: true });
 
@@ -102,16 +103,19 @@ describe("event bus", () => {
       expect(wc2).toBeNull();
     });
 
-    it("does not match retroactively (event before wait)", () => {
-      // Emit first, then register wait — event should NOT be found
+    it("matches retroactively when event was emitted before wait (TOCTOU fix)", () => {
+      // Emit first, then register wait — event SHOULD now be found (TOCTOU fix)
       emitEvent(store, "early.event", { data: "hello" });
 
       const taskId = createWaitingTask();
-      registerWaitCondition(store, taskId, "early.event");
+      const reg = registerWaitCondition(store, taskId, "early.event");
 
-      // No new event arrives — wait should still be active
+      // With the TOCTOU fix, registerWaitCondition now catches pending events
+      expect(reg.matched).toBe(true);
+      expect(reg.matchedEventData).toEqual({ data: "hello" });
+      // Wait condition should be cleaned up
       const wc = store.getWaitConditionForTask(taskId);
-      expect(wc).not.toBeNull();
+      expect(wc).toBeNull();
     });
   });
 
@@ -170,11 +174,12 @@ describe("event bus", () => {
   describe("registerWaitCondition", () => {
     it("creates a wait condition with timeout", () => {
       const taskId = createWaitingTask();
-      const wcId = registerWaitCondition(store, taskId, "test.event", undefined, 60_000);
+      const reg = registerWaitCondition(store, taskId, "test.event", undefined, 60_000);
 
+      expect(reg.matched).toBe(false);
       const wc = store.getWaitConditionForTask(taskId);
       expect(wc).not.toBeNull();
-      expect(wc!.id).toBe(wcId);
+      expect(wc!.id).toBe(reg.waitConditionId);
       expect(wc!.eventName).toBe("test.event");
       expect(wc!.timeoutAt).toBeDefined();
       expect(wc!.timeoutAt!).toBeGreaterThan(Date.now());
@@ -182,11 +187,50 @@ describe("event bus", () => {
 
     it("creates a wait condition without timeout", () => {
       const taskId = createWaitingTask();
-      registerWaitCondition(store, taskId, "test.event");
+      const reg = registerWaitCondition(store, taskId, "test.event");
 
+      expect(reg.matched).toBe(false);
       const wc = store.getWaitConditionForTask(taskId);
       expect(wc).not.toBeNull();
       expect(wc!.timeoutAt).toBeUndefined();
+    });
+
+    it("immediately matches an already-pending event (TOCTOU fix)", () => {
+      // Emit event before registering wait — simulates the race condition
+      store.insertEvent("early.event", { data: "hello" });
+
+      const taskId = createWaitingTask();
+      const reg = registerWaitCondition(store, taskId, "early.event");
+
+      // Should have matched immediately
+      expect(reg.matched).toBe(true);
+      expect(reg.matchedEventData).toEqual({ data: "hello" });
+
+      // Wait condition should be cleaned up
+      const wc = store.getWaitConditionForTask(taskId);
+      expect(wc).toBeNull();
+    });
+
+    it("matches pending event with filter", () => {
+      store.insertEvent("approval", { taskId: "target-task", comment: "ok" });
+
+      const taskId = createWaitingTask();
+      const reg = registerWaitCondition(store, taskId, "approval", { taskId: "target-task" });
+
+      expect(reg.matched).toBe(true);
+      expect(reg.matchedEventData).toEqual({ taskId: "target-task", comment: "ok" });
+    });
+
+    it("does not match pending event with wrong filter", () => {
+      store.insertEvent("approval", { taskId: "other-task" });
+
+      const taskId = createWaitingTask();
+      const reg = registerWaitCondition(store, taskId, "approval", { taskId: "target-task" });
+
+      expect(reg.matched).toBe(false);
+      // Wait condition should still exist
+      const wc = store.getWaitConditionForTask(taskId);
+      expect(wc).not.toBeNull();
     });
   });
 

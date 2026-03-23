@@ -29,6 +29,10 @@ export function emitEvent(
 /**
  * Register a wait condition for a task.
  * The task should already be in "waiting" status.
+ *
+ * After inserting the wait condition, immediately checks for an already-pending
+ * unconsumed event that matches. This closes the TOCTOU window where an event
+ * arrives between "task transitions to waiting" and "wait condition is inserted".
  */
 export function registerWaitCondition(
   store: TaskStore,
@@ -36,7 +40,17 @@ export function registerWaitCondition(
   eventName: string,
   filter?: Record<string, unknown>,
   timeoutMs?: number,
-): string {
+): { waitConditionId: string; matched: boolean; matchedEventData?: unknown } {
   const timeoutAt = timeoutMs ? Date.now() + timeoutMs : undefined;
-  return store.insertWaitCondition(taskId, eventName, filter, timeoutAt);
+  const waitConditionId = store.insertWaitCondition(taskId, eventName, filter, timeoutAt);
+
+  // Check for already-pending events (fixes TOCTOU race)
+  const pendingEvent = store.findUnconsumedEvent(eventName, filter);
+  if (pendingEvent) {
+    store.consumeEvent(pendingEvent.id, taskId);
+    store.removeWaitCondition(waitConditionId);
+    return { waitConditionId, matched: true, matchedEventData: pendingEvent.data };
+  }
+
+  return { waitConditionId, matched: false };
 }

@@ -38,6 +38,9 @@ const DEFAULT_CONFIG: Omit<DispatcherConfig, "spawnWorker" | "onManagerWake"> = 
   stuckSweepEveryNTicks: 12,
 };
 
+/** Minimum interval between manager wake calls for the same objective (ms). */
+const MANAGER_WAKE_DEDUP_MS = 10_000;
+
 // ---------------------------------------------------------------------------
 // TaskDispatcher
 // ---------------------------------------------------------------------------
@@ -52,6 +55,8 @@ export class TaskDispatcher {
   private nudgePending = false;
   /** In-memory tracking for inter-task delay enforcement. */
   private lastDispatchByObjective = new Map<string, number>();
+  /** Time-windowed dedup: skip manager wake for the same objective within 10s. */
+  private lastManagerWakeByObjective = new Map<string, number>();
 
   constructor(
     store: TaskStore,
@@ -120,10 +125,12 @@ export class TaskDispatcher {
     try {
       this.tickCount++;
 
-      // Stuck task sweep + expired wait conditions every N ticks
+      // Stuck task sweep + expired wait conditions + orphan cleanup every N ticks
       if (this.tickCount % this.config.stuckSweepEveryNTicks === 0) {
         await this.sweepStuckTasks();
         await this.sweepExpiredWaits();
+        await this.sweepOrphanedWaiting();
+        this.store.cleanupStaleEvents();
       }
 
       // Get ready tasks (pure query — no side-effecting promotion)
@@ -310,40 +317,48 @@ export class TaskDispatcher {
       }
     }
 
-    // Check manager trigger
+    // Check manager trigger (with time-windowed dedup to avoid duplicate wakes)
     const wakeReason = shouldWakeManager(task, this.store);
     if (wakeReason) {
-      log.info(`[task-dispatcher] Manager wake: ${wakeReason.reason} for task ${taskId}`);
+      const lastWake = this.lastManagerWakeByObjective.get(task.objectiveId) ?? 0;
+      if (Date.now() - lastWake < MANAGER_WAKE_DEDUP_MS) {
+        log.info(
+          `[task-dispatcher] Skipping duplicate manager wake for objective ${task.objectiveId} (within ${MANAGER_WAKE_DEDUP_MS}ms window)`,
+        );
+      } else {
+        this.lastManagerWakeByObjective.set(task.objectiveId, Date.now());
+        log.info(`[task-dispatcher] Manager wake: ${wakeReason.reason} for task ${taskId}`);
 
-      // Emit objective_completed hook
-      if (wakeReason.reason === "objective_completed") {
-        const progress = this.store.getObjectiveProgress(task.objectiveId);
-        const objective = this.store.getObjective(task.objectiveId);
-        if (objective) {
-          void hookRunner?.runObjectiveCompleted(
-            {
-              objectiveId: objective.id,
-              title: objective.title,
-              completedTasks: progress.completed,
-              failedTasks: progress.failed,
-              cancelledTasks: progress.cancelled,
-            },
-            taskCtx,
-          );
+        // Emit objective_completed hook
+        if (wakeReason.reason === "objective_completed") {
+          const progress = this.store.getObjectiveProgress(task.objectiveId);
+          const objective = this.store.getObjective(task.objectiveId);
+          if (objective) {
+            void hookRunner?.runObjectiveCompleted(
+              {
+                objectiveId: objective.id,
+                title: objective.title,
+                completedTasks: progress.completed,
+                failedTasks: progress.failed,
+                cancelledTasks: progress.cancelled,
+              },
+              taskCtx,
+            );
+          }
+
+          // Broadcast objective progress to dashboard clients
+          this.config.broadcast?.("objective.progress", {
+            objectiveId: task.objectiveId,
+            ...progress,
+          });
         }
 
-        // Broadcast objective progress to dashboard clients
-        this.config.broadcast?.("objective.progress", {
-          objectiveId: task.objectiveId,
-          ...progress,
-        });
-      }
-
-      try {
-        const context = buildManagerContext(wakeReason, task.objectiveId, this.store);
-        await this.config.onManagerWake(task.objectiveId, wakeReason.reason, context);
-      } catch (err) {
-        log.error(`[task-dispatcher] Manager re-invocation failed: ${String(err)}`);
+        try {
+          const context = buildManagerContext(wakeReason, task.objectiveId, this.store);
+          await this.config.onManagerWake(task.objectiveId, wakeReason.reason, context);
+        } catch (err) {
+          log.error(`[task-dispatcher] Manager re-invocation failed: ${String(err)}`);
+        }
       }
     }
 
@@ -410,6 +425,29 @@ export class TaskDispatcher {
           `[task-dispatcher] Wait condition expired for task ${wait.taskId} (event: ${wait.eventName})`,
         );
         await this.handleTaskCompletion(wait.taskId);
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Orphaned waiting task sweep
+  // -------------------------------------------------------------------------
+
+  /**
+   * Sweep tasks in "waiting" status that have no active wait condition.
+   * These are orphaned — the wait was cleaned up or never had a timeout.
+   */
+  private async sweepOrphanedWaiting(): Promise<void> {
+    const waiting = this.store.listTasks({ status: "waiting" });
+    for (const task of waiting) {
+      const wc = this.store.getWaitConditionForTask(task.id);
+      if (!wc) {
+        // No active wait condition — orphaned
+        this.store.updateTaskStatus(task.id, "failed");
+        log.warn(
+          `[task-dispatcher] Orphaned waiting task ${task.id} failed: no active wait condition`,
+        );
+        await this.handleTaskCompletion(task.id);
       }
     }
   }

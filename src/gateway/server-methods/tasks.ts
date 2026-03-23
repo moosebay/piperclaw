@@ -126,6 +126,21 @@ export const tasksHandlers: GatewayRequestHandlers = {
     respond(true, { steps });
   },
 
+  "tasks.audit.list": ({ params, respond }) => {
+    const store = getStore(respond);
+    if (!store) {
+      return;
+    }
+    const entityType =
+      params?.entityType === "task" || params?.entityType === "objective"
+        ? params.entityType
+        : undefined;
+    const entityId = typeof params?.entityId === "string" ? params.entityId : undefined;
+    const limit = typeof params?.limit === "number" ? params.limit : 100;
+    const entries = store.getAuditLog(entityType, entityId, limit);
+    respond(true, { entries });
+  },
+
   "tasks.approve": async ({ params, respond }) => {
     const store = getStore(respond);
     if (!store) {

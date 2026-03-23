@@ -22,6 +22,7 @@ const TASK_ACTIONS = [
   "objectives.list",
   "objectives.get",
   "objectives.complete",
+  "objectives.cancel",
   "objectives.pause",
   "objectives.resume",
   "tasks.create",
@@ -33,6 +34,7 @@ const TASK_ACTIONS = [
   "tasks.reject",
   "reports.get",
   "reports.list",
+  "audit.list",
 ] as const;
 
 const TasksToolSchema = Type.Object(
@@ -72,6 +74,8 @@ const TasksToolSchema = Type.Object(
     ] as const),
     // Update fields
     metadata: Type.Optional(Type.Object({}, { additionalProperties: true })),
+    // Audit fields
+    entityType: optionalStringEnum(["task", "objective"] as const),
     // Objective rate limiting
     rateLimitMaxPerWindow: Type.Optional(
       Type.Number({ description: "Max tasks completed per window" }),
@@ -111,6 +115,7 @@ Objectives:
 - objectives.list: List objectives (optional filter: status)
 - objectives.get: Get objective details with progress (requires id)
 - objectives.complete: Mark objective done (requires id)
+- objectives.cancel: Cancel objective and all non-terminal tasks (requires id)
 - objectives.pause / objectives.resume: Pause or resume an objective (requires id)
 
 Tasks:
@@ -124,7 +129,10 @@ Tasks:
 
 Reports:
 - reports.get: Get full report content (requires reportId)
-- reports.list: List reports by objective (requires objectiveId)`,
+- reports.list: List reports by objective (requires objectiveId)
+
+Audit:
+- audit.list: Get audit log entries (optional: id for entity ID, entityType for "task"|"objective")`,
     parameters: TasksToolSchema,
     async execute(_toolCallId: string, params: Record<string, unknown>) {
       const store = getTaskStore();
@@ -190,6 +198,12 @@ Reports:
           const id = readStringParam(params, "id", { required: true });
           store.markObjectiveCompleted(id);
           return jsonResult({ id, status: "completed" });
+        }
+
+        case "objectives.cancel": {
+          const id = readStringParam(params, "id", { required: true });
+          const cancelledCount = store.cancelObjective(id);
+          return jsonResult({ id, status: "cancelled", cancelledTasks: cancelledCount });
         }
 
         case "objectives.pause": {
@@ -367,6 +381,19 @@ Reports:
               createdAt: r.createdAt,
             })),
           });
+        }
+
+        // -----------------------------------------------------------------
+        // Audit
+        // -----------------------------------------------------------------
+        case "audit.list": {
+          const entityType =
+            params.entityType === "task" || params.entityType === "objective"
+              ? params.entityType
+              : undefined;
+          const entityId = typeof params.id === "string" ? params.id : undefined;
+          const entries = store.getAuditLog(entityType, entityId);
+          return jsonResult({ entries });
         }
 
         default:

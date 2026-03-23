@@ -5,6 +5,9 @@ import type { DatabaseSync } from "node:sqlite";
 import { requireNodeSqlite } from "../memory/sqlite.js";
 import { resolveConfigDir } from "../utils.js";
 import type {
+  AuditLogAction,
+  AuditLogEntityType,
+  AuditLogRecord,
   CreateObjectiveParams,
   CreateReportParams,
   CreateTaskParams,
@@ -138,6 +141,20 @@ CREATE INDEX IF NOT EXISTS idx_task_waits_event ON task_wait_conditions(event_na
 CREATE INDEX IF NOT EXISTS idx_task_waits_timeout ON task_wait_conditions(timeout_at)
   WHERE timeout_at IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS task_audit_log (
+  id TEXT PRIMARY KEY,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  from_status TEXT,
+  to_status TEXT,
+  actor TEXT,
+  detail TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_audit_entity ON task_audit_log(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON task_audit_log(created_at);
+
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_scheduled ON tasks(scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_agent ON tasks(agent_id);
@@ -240,6 +257,18 @@ type WaitConditionRow = {
   event_name: string;
   filter: string | null;
   timeout_at: number | null;
+  created_at: number;
+};
+
+type AuditLogRow = {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  from_status: string | null;
+  to_status: string | null;
+  actor: string | null;
+  detail: string | null;
   created_at: number;
 };
 
@@ -347,6 +376,20 @@ function waitConditionFromRow(row: WaitConditionRow): WaitCondition {
   };
 }
 
+function auditLogFromRow(row: AuditLogRow): AuditLogRecord {
+  return {
+    id: row.id,
+    entityType: row.entity_type as AuditLogEntityType,
+    entityId: row.entity_id,
+    action: row.action as AuditLogAction,
+    fromStatus: row.from_status ?? undefined,
+    toStatus: row.to_status ?? undefined,
+    actor: row.actor ?? undefined,
+    detail: row.detail ? (JSON.parse(row.detail) as Record<string, unknown>) : undefined,
+    createdAt: row.created_at,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // TaskStore
 // ---------------------------------------------------------------------------
@@ -442,6 +485,10 @@ export class TaskStore {
         params.rateLimit ? JSON.stringify(params.rateLimit) : null,
         params.interTaskDelayMs ?? null,
       );
+    this.appendAuditLog("objective", id, "created", {
+      toStatus: "active",
+      actor: params.proposedBy ?? "user",
+    });
     return id;
   }
 
@@ -560,6 +607,7 @@ export class TaskStore {
         params.retryAfterMs ?? 5000,
       );
 
+    this.appendAuditLog("task", id, "created", { toStatus: initialStatus });
     return id;
   }
 
@@ -631,6 +679,12 @@ export class TaskStore {
     const result = this.db
       .prepare("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND status = ?")
       .run(newStatus, now, id, current);
+    if (result.changes > 0) {
+      this.appendAuditLog("task", id, "status_changed", {
+        fromStatus: current,
+        toStatus: newStatus,
+      });
+    }
     return result.changes > 0;
   }
 
@@ -643,6 +697,13 @@ export class TaskStore {
          WHERE id = ? AND status = 'ready'`,
       )
       .run(runId, now, now, id);
+    if (result.changes > 0) {
+      this.appendAuditLog("task", id, "claimed", {
+        fromStatus: "ready",
+        toStatus: "running",
+        actor: "dispatcher",
+      });
+    }
     return result.changes > 0;
   }
 
@@ -681,6 +742,13 @@ export class TaskStore {
         id,
         runId,
       );
+    if (dbResult.changes > 0) {
+      this.appendAuditLog("task", id, "completed", {
+        fromStatus: "running",
+        toStatus: status,
+        actor: "worker",
+      });
+    }
     return dbResult.changes > 0;
   }
 
@@ -734,6 +802,13 @@ export class TaskStore {
          WHERE id = ? AND status = 'failed'`,
       )
       .run(newRetryCount, scheduledAt, now, id);
+
+    this.appendAuditLog("task", id, "retried", {
+      fromStatus: "failed",
+      toStatus: "pending",
+      actor: "dispatcher",
+      detail: { retryCount: newRetryCount, scheduledAt },
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -1105,5 +1180,143 @@ export class TaskStore {
       .prepare("SELECT * FROM task_wait_conditions WHERE task_id = ? LIMIT 1")
       .get(taskId) as WaitConditionRow | undefined;
     return row ? waitConditionFromRow(row) : null;
+  }
+
+  // -------------------------------------------------------------------------
+  // Event cleanup
+  // -------------------------------------------------------------------------
+
+  /** Delete stale consumed events (>24h) and expired unconsumed events. Returns deleted count. */
+  cleanupStaleEvents(): number {
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const r1 = this.db
+      .prepare("DELETE FROM task_events WHERE consumed_by_task_id IS NOT NULL AND created_at < ?")
+      .run(oneDayAgo);
+    const r2 = this.db
+      .prepare(
+        "DELETE FROM task_events WHERE expires_at IS NOT NULL AND expires_at < ? AND consumed_by_task_id IS NULL",
+      )
+      .run(now);
+    return Number(r1.changes) + Number(r2.changes);
+  }
+
+  /**
+   * Find the first unconsumed event matching the given event name and optional filter.
+   * Used to check for already-pending events when registering a wait condition.
+   */
+  findUnconsumedEvent(eventName: string, filter?: Record<string, unknown>): TaskEvent | null {
+    const rows = this.db
+      .prepare(
+        "SELECT * FROM task_events WHERE event_name = ? AND consumed_by_task_id IS NULL ORDER BY created_at ASC",
+      )
+      .all(eventName) as TaskEventRow[];
+
+    for (const row of rows) {
+      const event = eventFromRow(row);
+      // If filter is provided, verify event data contains all filter keys/values
+      if (filter && Object.keys(filter).length > 0) {
+        if (!event.data || typeof event.data !== "object") {
+          continue;
+        }
+        const dataObj = event.data as Record<string, unknown>;
+        let matches = true;
+        for (const [key, value] of Object.entries(filter)) {
+          if (dataObj[key] !== value) {
+            matches = false;
+            break;
+          }
+        }
+        if (!matches) {
+          continue;
+        }
+      }
+      return event;
+    }
+    return null;
+  }
+
+  // -------------------------------------------------------------------------
+  // Bulk cancel objective
+  // -------------------------------------------------------------------------
+
+  /**
+   * Cancel an objective and all its non-terminal tasks in a single transaction.
+   * Running tasks are left as-is (cleaned up by stuck task sweep or subagent completion).
+   * Returns the number of cancelled tasks.
+   */
+  cancelObjective(id: string): number {
+    return this.transaction(() => {
+      const now = Date.now();
+      this.db
+        .prepare("UPDATE objectives SET status = 'cancelled', updated_at = ? WHERE id = ?")
+        .run(now, id);
+
+      const result = this.db
+        .prepare(
+          `UPDATE tasks SET status = 'cancelled', updated_at = ?
+           WHERE objective_id = ? AND status IN ('pending', 'scheduled', 'ready', 'waiting')`,
+        )
+        .run(now, id);
+
+      this.appendAuditLog("objective", id, "cancelled", { actor: "dispatcher" });
+      return Number(result.changes);
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Audit log
+  // -------------------------------------------------------------------------
+
+  /** Append an entry to the audit log. */
+  appendAuditLog(
+    entityType: AuditLogEntityType,
+    entityId: string,
+    action: AuditLogAction,
+    opts?: {
+      fromStatus?: string;
+      toStatus?: string;
+      actor?: string;
+      detail?: Record<string, unknown>;
+    },
+  ): void {
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    this.db
+      .prepare(
+        `INSERT INTO task_audit_log (id, entity_type, entity_id, action, from_status, to_status, actor, detail, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        entityType,
+        entityId,
+        action,
+        opts?.fromStatus ?? null,
+        opts?.toStatus ?? null,
+        opts?.actor ?? null,
+        opts?.detail ? JSON.stringify(opts.detail) : null,
+        now,
+      );
+  }
+
+  /** Query audit log entries, optionally filtered by entity type/id. */
+  getAuditLog(entityType?: AuditLogEntityType, entityId?: string, limit = 100): AuditLogRecord[] {
+    const clauses: string[] = [];
+    const params: SqlParam[] = [];
+    if (entityType) {
+      clauses.push("entity_type = ?");
+      params.push(entityType);
+    }
+    if (entityId) {
+      clauses.push("entity_id = ?");
+      params.push(entityId);
+    }
+    const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+    params.push(limit);
+    const rows = this.db
+      .prepare(`SELECT * FROM task_audit_log ${where} ORDER BY created_at DESC LIMIT ?`)
+      .all(...params) as AuditLogRow[];
+    return rows.map(auditLogFromRow);
   }
 }

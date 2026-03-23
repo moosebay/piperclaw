@@ -1,0 +1,2538 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenClaw Tasks</title>
+    <style>
+      /* ---------- Reset & Base ---------- */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #0d1117;
+        --bg-surface: #161b22;
+        --bg-card: #1c2128;
+        --bg-hover: #252c35;
+        --border: #30363d;
+        --border-light: #3d444d;
+        --text: #e6edf3;
+        --text-dim: #8b949e;
+        --text-faint: #6e7681;
+        --accent: #58a6ff;
+        --accent-dim: #1f6feb;
+
+        /* Status colors */
+        --pending: #6e7681;
+        --scheduled: #6e7681;
+        --ready: #58a6ff;
+        --running: #d29922;
+        --waiting: #a371f7;
+        --completed: #3fb950;
+        --failed: #f85149;
+        --cancelled: #6e7681;
+
+        /* Objective status */
+        --active: #3fb950;
+        --paused: #d29922;
+
+        --sidebar-w: 220px;
+        --header-h: 52px;
+        --font-mono:
+          "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", Menlo, Consolas, monospace;
+        --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        --radius: 6px;
+        --radius-lg: 10px;
+        --transition: 150ms ease;
+      }
+
+      html,
+      body {
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ---------- Layout ---------- */
+      .app {
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* ---------- Sidebar ---------- */
+      .sidebar {
+        width: var(--sidebar-w);
+        min-width: var(--sidebar-w);
+        background: var(--bg-surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        z-index: 10;
+      }
+
+      .sidebar-header {
+        padding: 16px 16px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .sidebar-logo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.3px;
+        color: var(--text);
+      }
+
+      .sidebar-logo .logo-mark {
+        width: 22px;
+        height: 22px;
+        background: var(--accent);
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      .sidebar-subtitle {
+        font-size: 11px;
+        color: var(--text-dim);
+        margin-top: 2px;
+        font-weight: 400;
+      }
+
+      .sidebar-nav {
+        flex: 1;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: var(--radius);
+        cursor: pointer;
+        color: var(--text-dim);
+        font-size: 13px;
+        font-weight: 500;
+        transition: all var(--transition);
+        border: 1px solid transparent;
+        user-select: none;
+      }
+
+      .nav-item:hover {
+        background: var(--bg-hover);
+        color: var(--text);
+      }
+
+      .nav-item.active {
+        background: var(--bg-hover);
+        color: var(--text);
+        border-color: var(--border);
+      }
+
+      .nav-icon {
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        opacity: 0.7;
+      }
+
+      .nav-item.active .nav-icon {
+        opacity: 1;
+      }
+
+      .sidebar-status {
+        padding: 12px 16px;
+        border-top: 1px solid var(--border);
+        font-size: 11px;
+      }
+
+      .status-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+
+      .status-dot.connected {
+        background: var(--completed);
+        box-shadow: 0 0 6px var(--completed);
+      }
+      .status-dot.disconnected {
+        background: var(--failed);
+      }
+      .status-dot.connecting {
+        background: var(--running);
+        animation: pulse 1.2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+
+      /* ---------- Main Content ---------- */
+      .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-width: 0;
+      }
+
+      .main-header {
+        height: var(--header-h);
+        min-height: var(--header-h);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-surface);
+      }
+
+      .main-header h1 {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.2px;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+        color: var(--text-dim);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        cursor: pointer;
+        transition: all var(--transition);
+        white-space: nowrap;
+      }
+
+      .btn:hover {
+        background: var(--bg-hover);
+        color: var(--text);
+        border-color: var(--border-light);
+      }
+
+      .btn-primary {
+        background: var(--accent-dim);
+        border-color: var(--accent-dim);
+        color: #fff;
+      }
+
+      .btn-primary:hover {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+
+      .main-body {
+        flex: 1;
+        overflow: auto;
+        padding: 20px 24px;
+      }
+
+      /* ---------- View Containers ---------- */
+      .view {
+        display: none;
+        height: 100%;
+      }
+      .view.active {
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ---------- Filters Bar ---------- */
+      .filters-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+
+      .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .filter-label {
+        font-size: 11px;
+        color: var(--text-faint);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+      }
+
+      .filter-select {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        padding: 4px 8px;
+        cursor: pointer;
+        outline: none;
+      }
+
+      .filter-select:focus {
+        border-color: var(--accent);
+      }
+
+      .filter-select option {
+        background: var(--bg-card);
+        color: var(--text);
+      }
+
+      .filter-input {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        padding: 4px 8px;
+        outline: none;
+        width: 180px;
+      }
+
+      .filter-input:focus {
+        border-color: var(--accent);
+      }
+
+      /* ---------- Kanban ---------- */
+      .kanban-container {
+        flex: 1;
+        overflow-x: auto;
+        overflow-y: hidden;
+      }
+
+      .kanban {
+        display: flex;
+        gap: 12px;
+        min-height: 100%;
+        padding-bottom: 16px;
+      }
+
+      .kanban-column {
+        min-width: 240px;
+        max-width: 280px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+      }
+
+      .column-header {
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--border);
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .column-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .column-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+
+      .column-count {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1px 7px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-dim);
+      }
+
+      .column-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      /* ---------- Task Card ---------- */
+      .task-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px 12px;
+        cursor: pointer;
+        transition: all var(--transition);
+      }
+
+      .task-card:hover {
+        border-color: var(--border-light);
+        background: var(--bg-hover);
+      }
+
+      .task-card-title {
+        font-weight: 600;
+        font-size: 12px;
+        margin-bottom: 4px;
+        line-height: 1.4;
+        word-break: break-word;
+      }
+
+      .task-card-objective {
+        font-size: 11px;
+        color: var(--text-faint);
+        margin-bottom: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .task-card-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .skill-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 6px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 600;
+        background: rgba(88, 166, 255, 0.15);
+        color: var(--accent);
+        border: 1px solid rgba(88, 166, 255, 0.2);
+        text-transform: lowercase;
+      }
+
+      .time-badge {
+        font-size: 10px;
+        color: var(--text-faint);
+      }
+
+      .priority-badge {
+        font-size: 10px;
+        font-weight: 600;
+        padding: 0 4px;
+        border-radius: 3px;
+      }
+
+      .priority-badge.high {
+        background: rgba(248, 81, 73, 0.15);
+        color: var(--failed);
+      }
+
+      .priority-badge.medium {
+        background: rgba(210, 153, 34, 0.15);
+        color: var(--running);
+      }
+
+      .retry-badge {
+        font-size: 10px;
+        color: var(--running);
+      }
+
+      /* ---------- Task Detail Modal ---------- */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 100;
+        justify-content: center;
+        align-items: flex-start;
+        padding-top: 60px;
+        overflow-y: auto;
+      }
+
+      .modal-overlay.active {
+        display: flex;
+      }
+
+      .modal {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        width: 600px;
+        max-width: 90vw;
+        max-height: calc(100vh - 120px);
+        overflow-y: auto;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+      }
+
+      .modal-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .modal-title {
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+
+      .modal-close {
+        background: none;
+        border: none;
+        color: var(--text-dim);
+        font-size: 20px;
+        cursor: pointer;
+        padding: 0 4px;
+        line-height: 1;
+        font-family: var(--font-mono);
+      }
+
+      .modal-close:hover {
+        color: var(--text);
+      }
+
+      .modal-body {
+        padding: 16px 20px;
+      }
+
+      .detail-section {
+        margin-bottom: 16px;
+      }
+
+      .detail-section:last-child {
+        margin-bottom: 0;
+      }
+
+      .detail-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: var(--text-faint);
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .detail-value {
+        font-size: 12px;
+        color: var(--text);
+        line-height: 1.5;
+      }
+
+      .detail-value pre {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px 12px;
+        overflow-x: auto;
+        font-size: 11px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .step-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .step-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 8px;
+        background: var(--bg);
+        border-radius: var(--radius);
+        font-size: 11px;
+      }
+
+      .step-icon {
+        font-size: 12px;
+      }
+      .step-icon.completed {
+        color: var(--completed);
+      }
+      .step-icon.failed {
+        color: var(--failed);
+      }
+
+      .deps-list {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 11px;
+      }
+
+      .dep-item {
+        color: var(--text-dim);
+        padding: 2px 0;
+      }
+
+      .dep-item .dep-arrow {
+        color: var(--accent);
+        margin-right: 4px;
+      }
+
+      /* ---------- Status Badge ---------- */
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+      }
+
+      .status-badge.pending {
+        background: rgba(110, 118, 129, 0.15);
+        color: var(--pending);
+      }
+      .status-badge.scheduled {
+        background: rgba(110, 118, 129, 0.15);
+        color: var(--scheduled);
+      }
+      .status-badge.ready {
+        background: rgba(88, 166, 255, 0.15);
+        color: var(--ready);
+      }
+      .status-badge.running {
+        background: rgba(210, 153, 34, 0.15);
+        color: var(--running);
+      }
+      .status-badge.waiting {
+        background: rgba(163, 113, 247, 0.15);
+        color: var(--waiting);
+      }
+      .status-badge.completed {
+        background: rgba(63, 185, 80, 0.15);
+        color: var(--completed);
+      }
+      .status-badge.failed {
+        background: rgba(248, 81, 73, 0.15);
+        color: var(--failed);
+      }
+      .status-badge.cancelled {
+        background: rgba(110, 118, 129, 0.15);
+        color: var(--cancelled);
+        text-decoration: line-through;
+      }
+      .status-badge.active {
+        background: rgba(63, 185, 80, 0.15);
+        color: var(--active);
+      }
+      .status-badge.paused {
+        background: rgba(210, 153, 34, 0.15);
+        color: var(--paused);
+      }
+
+      /* ---------- Objectives View ---------- */
+      .objectives-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        flex: 1;
+        overflow-y: auto;
+      }
+
+      .objective-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 16px 20px;
+        transition: all var(--transition);
+      }
+
+      .objective-card:hover {
+        border-color: var(--border-light);
+      }
+
+      .objective-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .objective-title {
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+
+      .objective-description {
+        font-size: 12px;
+        color: var(--text-dim);
+        margin-bottom: 12px;
+        line-height: 1.5;
+      }
+
+      .objective-progress {
+        margin-bottom: 8px;
+      }
+
+      .progress-bar-track {
+        height: 6px;
+        background: var(--bg);
+        border-radius: 3px;
+        overflow: hidden;
+        display: flex;
+      }
+
+      .progress-segment {
+        height: 100%;
+        transition: width 400ms ease;
+      }
+
+      .progress-segment.completed {
+        background: var(--completed);
+      }
+      .progress-segment.running {
+        background: var(--running);
+      }
+      .progress-segment.waiting {
+        background: var(--waiting);
+      }
+      .progress-segment.ready {
+        background: var(--ready);
+      }
+      .progress-segment.failed {
+        background: var(--failed);
+      }
+      .progress-segment.cancelled {
+        background: var(--cancelled);
+        opacity: 0.5;
+      }
+
+      .progress-stats {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+
+      .progress-stat {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .progress-stat-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+
+      .objective-meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 11px;
+        color: var(--text-faint);
+        margin-top: 8px;
+      }
+
+      /* ---------- Audit View ---------- */
+      .audit-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .audit-table-wrap {
+        flex: 1;
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+      }
+
+      .audit-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      .audit-table thead {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+      }
+
+      .audit-table th {
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border);
+        padding: 8px 12px;
+        text-align: left;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-faint);
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .audit-table td {
+        padding: 6px 12px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+        white-space: nowrap;
+      }
+
+      .audit-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .audit-table tr:hover td {
+        background: var(--bg-hover);
+      }
+
+      .audit-transition {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .audit-arrow {
+        color: var(--text-faint);
+        font-size: 11px;
+      }
+
+      .audit-action {
+        font-weight: 600;
+      }
+
+      .audit-action.created {
+        color: var(--completed);
+      }
+      .audit-action.started {
+        color: var(--running);
+      }
+      .audit-action.completed {
+        color: var(--completed);
+      }
+      .audit-action.failed {
+        color: var(--failed);
+      }
+      .audit-action.cancelled {
+        color: var(--cancelled);
+      }
+      .audit-action.retried {
+        color: var(--running);
+      }
+      .audit-action.waiting {
+        color: var(--waiting);
+      }
+      .audit-action.resumed {
+        color: var(--accent);
+      }
+      .audit-action.promoted {
+        color: var(--ready);
+      }
+
+      /* ---------- Org View ---------- */
+      .org-container {
+        flex: 1;
+        overflow-y: auto;
+      }
+
+      .org-tree {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .org-objective {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+      }
+
+      .org-objective-header {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        cursor: pointer;
+        transition: background var(--transition);
+      }
+
+      .org-objective-header:hover {
+        background: var(--bg-hover);
+      }
+
+      .org-objective-title {
+        font-weight: 600;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .org-objective-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+
+      .org-tasks {
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .org-task {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: var(--radius);
+        font-size: 12px;
+        transition: background var(--transition);
+      }
+
+      .org-task:hover {
+        background: var(--bg-hover);
+      }
+
+      .org-task-connector {
+        width: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--border-light);
+        font-size: 10px;
+      }
+
+      .org-task-title {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .org-task-skill {
+        font-size: 10px;
+        color: var(--accent);
+        white-space: nowrap;
+      }
+
+      .org-task-deps {
+        font-size: 10px;
+        color: var(--text-faint);
+        white-space: nowrap;
+      }
+
+      /* ---------- Empty State ---------- */
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        color: var(--text-dim);
+        text-align: center;
+        gap: 8px;
+      }
+
+      .empty-state-icon {
+        font-size: 32px;
+        opacity: 0.4;
+        margin-bottom: 4px;
+      }
+
+      .empty-state-title {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .empty-state-hint {
+        font-size: 12px;
+        color: var(--text-faint);
+      }
+
+      /* ---------- Loading Skeleton ---------- */
+      .skeleton {
+        background: linear-gradient(
+          90deg,
+          var(--bg-card) 25%,
+          var(--bg-hover) 50%,
+          var(--bg-card) 75%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+        border-radius: var(--radius);
+      }
+
+      @keyframes shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+
+      /* ---------- Scrollbar ---------- */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--border-light);
+      }
+
+      /* ---------- Responsive ---------- */
+      @media (max-width: 768px) {
+        .sidebar {
+          width: 56px;
+          min-width: 56px;
+        }
+        .sidebar-header {
+          padding: 12px 8px;
+        }
+        .sidebar-logo span {
+          display: none;
+        }
+        .sidebar-subtitle {
+          display: none;
+        }
+        .nav-item span:not(.nav-icon) {
+          display: none;
+        }
+        .nav-item {
+          justify-content: center;
+          padding: 10px;
+        }
+        .sidebar-status {
+          display: none;
+        }
+        .main-body {
+          padding: 12px;
+        }
+        .kanban-column {
+          min-width: 200px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-logo">
+            <div class="logo-mark">OC</div>
+            <span>OpenClaw</span>
+          </div>
+          <div class="sidebar-subtitle">Task Dashboard</div>
+        </div>
+        <nav class="sidebar-nav">
+          <div class="nav-item active" data-view="kanban">
+            <span class="nav-icon">&#9633;</span>
+            <span>Kanban</span>
+          </div>
+          <div class="nav-item" data-view="objectives">
+            <span class="nav-icon">&#9678;</span>
+            <span>Objectives</span>
+          </div>
+          <div class="nav-item" data-view="audit">
+            <span class="nav-icon">&#9776;</span>
+            <span>Audit Log</span>
+          </div>
+          <div class="nav-item" data-view="org">
+            <span class="nav-icon">&#9673;</span>
+            <span>Org Structure</span>
+          </div>
+        </nav>
+        <div class="sidebar-status">
+          <span class="status-dot connecting" id="ws-status-dot"></span>
+          <span id="ws-status-text">Connecting...</span>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="main">
+        <header class="main-header">
+          <h1 id="view-title">Kanban Board</h1>
+          <div class="header-actions">
+            <button class="btn" id="btn-refresh" title="Refresh data">Refresh</button>
+            <span id="last-updated" style="font-size: 11px; color: var(--text-faint)"></span>
+          </div>
+        </header>
+
+        <div class="main-body">
+          <!-- Kanban View -->
+          <div class="view active" id="view-kanban">
+            <div class="filters-bar">
+              <div class="filter-group">
+                <span class="filter-label">Skill</span>
+                <select class="filter-select" id="filter-skill">
+                  <option value="">All</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <span class="filter-label">Objective</span>
+                <select class="filter-select" id="filter-objective">
+                  <option value="">All</option>
+                </select>
+              </div>
+            </div>
+            <div class="kanban-container">
+              <div class="kanban" id="kanban-board"></div>
+            </div>
+          </div>
+
+          <!-- Objectives View -->
+          <div class="view" id="view-objectives">
+            <div class="filters-bar">
+              <div class="filter-group">
+                <span class="filter-label">Status</span>
+                <select class="filter-select" id="filter-obj-status">
+                  <option value="">All</option>
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+            </div>
+            <div class="objectives-list" id="objectives-list"></div>
+          </div>
+
+          <!-- Audit View -->
+          <div class="view" id="view-audit">
+            <div class="filters-bar">
+              <div class="filter-group">
+                <span class="filter-label">Entity</span>
+                <input
+                  class="filter-input"
+                  id="filter-audit-entity"
+                  placeholder="Filter by task/objective ID..."
+                />
+              </div>
+              <div class="filter-group">
+                <span class="filter-label">Action</span>
+                <select class="filter-select" id="filter-audit-action">
+                  <option value="">All</option>
+                </select>
+              </div>
+            </div>
+            <div class="audit-container">
+              <div class="audit-table-wrap" id="audit-table-wrap">
+                <table class="audit-table">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Entity</th>
+                      <th>Action</th>
+                      <th>Transition</th>
+                      <th>Actor</th>
+                      <th>Detail</th>
+                    </tr>
+                  </thead>
+                  <tbody id="audit-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Org Structure View -->
+          <div class="view" id="view-org">
+            <div class="filters-bar">
+              <div class="filter-group">
+                <span class="filter-label">Role</span>
+                <select class="filter-select" id="filter-org-role">
+                  <option value="">All</option>
+                  <option value="manager">Managers</option>
+                  <option value="worker">Workers</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <span class="filter-label">Skill</span>
+                <select class="filter-select" id="filter-org-skill">
+                  <option value="">All</option>
+                </select>
+              </div>
+            </div>
+            <div class="org-container">
+              <div class="org-tree" id="org-tree"></div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Task Detail Modal -->
+    <div class="modal-overlay" id="task-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title" id="modal-task-title"></div>
+            <div style="margin-top: 4px" id="modal-task-status"></div>
+          </div>
+          <button class="modal-close" id="modal-close">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-task-body"></div>
+      </div>
+    </div>
+
+    <script>
+      // =========================================================================
+      // OpenClaw Task Dashboard
+      // =========================================================================
+
+      (function () {
+        "use strict";
+
+        // -----------------------------------------------------------------------
+        // State
+        // -----------------------------------------------------------------------
+        const state = {
+          ws: null,
+          connected: false,
+          reconnectTimer: null,
+          reconnectDelay: 1000,
+          rpcId: 0,
+          rpcCallbacks: new Map(),
+
+          objectives: [], // ObjectiveRecord + progress
+          tasks: [], // TaskRecord[]
+          auditLog: [], // AuditEntry[]  (synthetic until tasks.audit.list wired)
+          taskDetails: new Map(), // taskId -> { task, report, steps, waitCondition }
+
+          // Filters
+          filterSkill: "",
+          filterObjective: "",
+          filterObjStatus: "",
+          filterAuditEntity: "",
+          filterAuditAction: "",
+          filterOrgRole: "",
+          filterOrgSkill: "",
+
+          activeView: "kanban",
+        };
+
+        // -----------------------------------------------------------------------
+        // Column definitions for Kanban
+        // -----------------------------------------------------------------------
+        const KANBAN_COLUMNS = [
+          { status: "pending", label: "Pending", color: "var(--pending)" },
+          { status: "ready", label: "Ready", color: "var(--ready)" },
+          { status: "running", label: "Running", color: "var(--running)" },
+          { status: "waiting", label: "Waiting", color: "var(--waiting)" },
+          { status: "completed", label: "Completed", color: "var(--completed)" },
+          { status: "failed", label: "Failed", color: "var(--failed)" },
+          { status: "cancelled", label: "Cancelled", color: "var(--cancelled)" },
+        ];
+
+        // -----------------------------------------------------------------------
+        // Utility
+        // -----------------------------------------------------------------------
+        function shortId(id) {
+          if (!id) return "?";
+          return id.length > 8 ? id.slice(0, 8) : id;
+        }
+
+        function timeAgo(ts) {
+          if (!ts) return "";
+          const diff = Date.now() - ts;
+          if (diff < 0) return "just now";
+          const seconds = Math.floor(diff / 1000);
+          if (seconds < 60) return seconds + "s ago";
+          const minutes = Math.floor(seconds / 60);
+          if (minutes < 60) return minutes + "m ago";
+          const hours = Math.floor(minutes / 60);
+          if (hours < 24) return hours + "h ago";
+          const days = Math.floor(hours / 24);
+          return days + "d ago";
+        }
+
+        function formatTime(ts) {
+          if (!ts) return "-";
+          const d = new Date(ts);
+          return d.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          });
+        }
+
+        function formatDateTime(ts) {
+          if (!ts) return "-";
+          const d = new Date(ts);
+          return (
+            d.toLocaleDateString([], { month: "short", day: "numeric" }) +
+            " " +
+            d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+          );
+        }
+
+        function durationStr(startTs, endTs) {
+          if (!startTs) return "-";
+          const end = endTs || Date.now();
+          const diff = end - startTs;
+          if (diff < 1000) return diff + "ms";
+          const seconds = Math.floor(diff / 1000);
+          if (seconds < 60) return seconds + "s";
+          const minutes = Math.floor(seconds / 60);
+          const remSec = seconds % 60;
+          if (minutes < 60) return minutes + "m " + remSec + "s";
+          const hours = Math.floor(minutes / 60);
+          const remMin = minutes % 60;
+          return hours + "h " + remMin + "m";
+        }
+
+        function escapeHtml(str) {
+          if (!str) return "";
+          return str
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+        }
+
+        function getObjectiveTitle(objectiveId) {
+          const obj = state.objectives.find(function (o) {
+            return o.id === objectiveId;
+          });
+          return obj ? obj.title : shortId(objectiveId);
+        }
+
+        // -----------------------------------------------------------------------
+        // WebSocket Connection
+        // -----------------------------------------------------------------------
+        function connect() {
+          if (state.ws) {
+            try {
+              state.ws.close();
+            } catch (e) {
+              /* ignore */
+            }
+          }
+
+          updateConnectionStatus("connecting");
+
+          var protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+          var wsUrl = protocol + "//" + window.location.host;
+          var ws;
+          try {
+            ws = new WebSocket(wsUrl);
+          } catch (e) {
+            updateConnectionStatus("disconnected");
+            scheduleReconnect();
+            return;
+          }
+
+          state.ws = ws;
+
+          ws.onopen = function () {
+            // Send connect handshake
+            sendRaw({
+              type: "req",
+              id: "connect-" + ++state.rpcId,
+              method: "connect",
+              params: {
+                minProtocol: 3,
+                maxProtocol: 3,
+                client: {
+                  id: "openclaw-control-ui",
+                  version: "1.0.0",
+                  platform: "web",
+                  mode: "ui",
+                },
+                role: "operator",
+                scopes: ["read", "write"],
+              },
+            });
+          };
+
+          ws.onmessage = function (event) {
+            var data;
+            try {
+              data = JSON.parse(event.data);
+            } catch (e) {
+              return;
+            }
+            handleMessage(data);
+          };
+
+          ws.onclose = function () {
+            state.connected = false;
+            updateConnectionStatus("disconnected");
+            scheduleReconnect();
+          };
+
+          ws.onerror = function () {
+            // onclose will fire after this
+          };
+        }
+
+        function sendRaw(obj) {
+          if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+            state.ws.send(JSON.stringify(obj));
+          }
+        }
+
+        function rpcCall(method, params) {
+          return new Promise(function (resolve, reject) {
+            var id = "rpc-" + ++state.rpcId;
+            state.rpcCallbacks.set(id, { resolve: resolve, reject: reject, ts: Date.now() });
+            sendRaw({ type: "req", id: id, method: method, params: params || {} });
+
+            // Timeout after 15s
+            setTimeout(function () {
+              if (state.rpcCallbacks.has(id)) {
+                state.rpcCallbacks.delete(id);
+                reject(new Error("RPC timeout: " + method));
+              }
+            }, 15000);
+          });
+        }
+
+        function handleMessage(data) {
+          if (!data || typeof data !== "object") return;
+
+          // Response to RPC call
+          if (data.type === "res") {
+            // Handle connect handshake response
+            if (typeof data.id === "string" && data.id.startsWith("connect-")) {
+              if (data.ok) {
+                state.connected = true;
+                state.reconnectDelay = 1000;
+                updateConnectionStatus("connected");
+                loadAllData();
+              } else {
+                updateConnectionStatus("disconnected");
+              }
+              return;
+            }
+
+            var cb = state.rpcCallbacks.get(data.id);
+            if (cb) {
+              state.rpcCallbacks.delete(data.id);
+              if (data.ok) {
+                cb.resolve(data.payload);
+              } else {
+                cb.reject(new Error(data.error ? data.error.message : "RPC error"));
+              }
+            }
+            return;
+          }
+
+          // Event broadcast
+          if (data.type === "event") {
+            handleEvent(data.event, data.payload);
+          }
+        }
+
+        function handleEvent(eventName, payload) {
+          if (eventName === "task.status") {
+            // Update task in local state
+            var taskIdx = state.tasks.findIndex(function (t) {
+              return t.id === payload.taskId;
+            });
+            if (taskIdx >= 0) {
+              var prevStatus = state.tasks[taskIdx].status;
+              state.tasks[taskIdx].status = payload.status;
+              state.tasks[taskIdx].updatedAt = Date.now();
+
+              // Add synthetic audit entry
+              addAuditEntry({
+                time: Date.now(),
+                entityType: "task",
+                entityId: payload.taskId,
+                entityTitle: state.tasks[taskIdx].title,
+                action:
+                  payload.status === "failed"
+                    ? "failed"
+                    : payload.status === "completed"
+                      ? "completed"
+                      : "status_change",
+                fromStatus: prevStatus,
+                toStatus: payload.status,
+                actor: "dispatcher",
+                detail: "",
+              });
+            }
+
+            // Refresh detail if needed
+            rpcCall("tasks.get", { id: payload.taskId })
+              .then(function (res) {
+                if (res && res.task) {
+                  // Update in task array
+                  var idx = state.tasks.findIndex(function (t) {
+                    return t.id === res.task.id;
+                  });
+                  if (idx >= 0) {
+                    state.tasks[idx] = res.task;
+                  }
+                  state.taskDetails.set(res.task.id, res);
+                }
+                renderCurrentView();
+              })
+              .catch(function () {
+                renderCurrentView();
+              });
+            return;
+          }
+
+          if (eventName === "objective.progress") {
+            var objIdx = state.objectives.findIndex(function (o) {
+              return o.id === payload.objectiveId;
+            });
+            if (objIdx >= 0) {
+              state.objectives[objIdx].progress = payload;
+            }
+            renderCurrentView();
+            return;
+          }
+        }
+
+        function scheduleReconnect() {
+          if (state.reconnectTimer) return;
+          state.reconnectTimer = setTimeout(function () {
+            state.reconnectTimer = null;
+            state.reconnectDelay = Math.min(state.reconnectDelay * 1.5, 30000);
+            connect();
+          }, state.reconnectDelay);
+        }
+
+        function updateConnectionStatus(status) {
+          var dot = document.getElementById("ws-status-dot");
+          var text = document.getElementById("ws-status-text");
+          dot.className = "status-dot " + status;
+          if (status === "connected") {
+            text.textContent = "Connected";
+          } else if (status === "connecting") {
+            text.textContent = "Connecting...";
+          } else {
+            text.textContent = "Disconnected";
+          }
+        }
+
+        // -----------------------------------------------------------------------
+        // Data Loading
+        // -----------------------------------------------------------------------
+        function loadAllData() {
+          Promise.all([
+            rpcCall("tasks.objectives.list", {}).catch(function () {
+              return { objectives: [] };
+            }),
+            rpcCall("tasks.list", {}).catch(function () {
+              return { tasks: [] };
+            }),
+          ]).then(function (results) {
+            state.objectives = results[0].objectives || [];
+            state.tasks = results[1].tasks || [];
+
+            // Build initial audit log from task data
+            buildInitialAuditLog();
+
+            // Populate filter dropdowns
+            updateFilterDropdowns();
+
+            // Try loading audit log from server (may not exist yet)
+            rpcCall("tasks.audit.list", {})
+              .then(function (res) {
+                if (res && res.entries && res.entries.length > 0) {
+                  state.auditLog = res.entries.map(normalizeAuditEntry);
+                  state.auditLog.sort(function (a, b) {
+                    return a.time - b.time;
+                  });
+                }
+                renderCurrentView();
+              })
+              .catch(function () {
+                // audit.list not available yet; use synthetic log
+                renderCurrentView();
+              });
+
+            document.getElementById("last-updated").textContent =
+              "Updated " + formatTime(Date.now());
+            renderCurrentView();
+          });
+        }
+
+        function normalizeAuditEntry(entry) {
+          return {
+            time: entry.time || entry.createdAt || entry.timestamp || Date.now(),
+            entityType: entry.entityType || "task",
+            entityId: entry.entityId || entry.taskId || entry.objectiveId || "",
+            entityTitle: entry.entityTitle || entry.title || "",
+            action: entry.action || entry.type || "",
+            fromStatus: entry.fromStatus || entry.from || "",
+            toStatus: entry.toStatus || entry.to || "",
+            actor: entry.actor || entry.by || "system",
+            detail: entry.detail || entry.message || "",
+          };
+        }
+
+        function buildInitialAuditLog() {
+          var entries = [];
+
+          state.objectives.forEach(function (obj) {
+            entries.push({
+              time: obj.createdAt,
+              entityType: "objective",
+              entityId: obj.id,
+              entityTitle: obj.title,
+              action: "created",
+              fromStatus: "",
+              toStatus: obj.status,
+              actor: obj.proposedBy || "user",
+              detail: "",
+            });
+            if (obj.completedAt) {
+              entries.push({
+                time: obj.completedAt,
+                entityType: "objective",
+                entityId: obj.id,
+                entityTitle: obj.title,
+                action: "completed",
+                fromStatus: "active",
+                toStatus: "completed",
+                actor: "system",
+                detail: "",
+              });
+            }
+          });
+
+          state.tasks.forEach(function (task) {
+            entries.push({
+              time: task.createdAt,
+              entityType: "task",
+              entityId: task.id,
+              entityTitle: task.title,
+              action: "created",
+              fromStatus: "",
+              toStatus: "pending",
+              actor: "manager",
+              detail: task.assignedSkill ? "skill: " + task.assignedSkill : "",
+            });
+
+            if (task.startedAt) {
+              entries.push({
+                time: task.startedAt,
+                entityType: "task",
+                entityId: task.id,
+                entityTitle: task.title,
+                action: "started",
+                fromStatus: "ready",
+                toStatus: "running",
+                actor: "dispatcher",
+                detail: "",
+              });
+            }
+
+            if (task.status === "completed" && task.completedAt) {
+              entries.push({
+                time: task.completedAt,
+                entityType: "task",
+                entityId: task.id,
+                entityTitle: task.title,
+                action: "completed",
+                fromStatus: "running",
+                toStatus: "completed",
+                actor: "worker",
+                detail: "",
+              });
+            }
+
+            if (task.status === "failed" && task.completedAt) {
+              entries.push({
+                time: task.completedAt,
+                entityType: "task",
+                entityId: task.id,
+                entityTitle: task.title,
+                action: "failed",
+                fromStatus: "running",
+                toStatus: "failed",
+                actor: "worker",
+                detail: task.error ? task.error.slice(0, 80) : "",
+              });
+            }
+
+            if (task.status === "cancelled") {
+              entries.push({
+                time: task.updatedAt,
+                entityType: "task",
+                entityId: task.id,
+                entityTitle: task.title,
+                action: "cancelled",
+                fromStatus: "",
+                toStatus: "cancelled",
+                actor: "system",
+                detail: "",
+              });
+            }
+
+            if (task.retryCount > 0) {
+              for (var i = 0; i < task.retryCount; i++) {
+                entries.push({
+                  time: task.createdAt + (i + 1) * 1000, // approximate
+                  entityType: "task",
+                  entityId: task.id,
+                  entityTitle: task.title,
+                  action: "retried",
+                  fromStatus: "failed",
+                  toStatus: "pending",
+                  actor: "dispatcher",
+                  detail: "retry " + (i + 1) + "/" + task.maxRetries,
+                });
+              }
+            }
+          });
+
+          entries.sort(function (a, b) {
+            return a.time - b.time;
+          });
+          state.auditLog = entries;
+        }
+
+        function addAuditEntry(entry) {
+          state.auditLog.push(entry);
+          if (state.activeView === "audit") {
+            renderAuditView();
+          }
+        }
+
+        function updateFilterDropdowns() {
+          // Skills
+          var skills = new Set();
+          state.tasks.forEach(function (t) {
+            if (t.assignedSkill) skills.add(t.assignedSkill);
+          });
+          var skillArr = Array.from(skills).sort();
+
+          populateSelect("filter-skill", skillArr);
+          populateSelect("filter-org-skill", skillArr);
+
+          // Objectives in filter
+          var objSelect = document.getElementById("filter-objective");
+          objSelect.innerHTML = '<option value="">All</option>';
+          state.objectives.forEach(function (o) {
+            var opt = document.createElement("option");
+            opt.value = o.id;
+            opt.textContent = o.title.length > 30 ? o.title.slice(0, 30) + "..." : o.title;
+            objSelect.appendChild(opt);
+          });
+
+          // Audit actions
+          var actions = new Set();
+          state.auditLog.forEach(function (e) {
+            if (e.action) actions.add(e.action);
+          });
+          populateSelect("filter-audit-action", Array.from(actions).sort());
+        }
+
+        function populateSelect(id, values) {
+          var sel = document.getElementById(id);
+          var current = sel.value;
+          sel.innerHTML = '<option value="">All</option>';
+          values.forEach(function (v) {
+            var opt = document.createElement("option");
+            opt.value = v;
+            opt.textContent = v;
+            sel.appendChild(opt);
+          });
+          sel.value = current;
+        }
+
+        // -----------------------------------------------------------------------
+        // Task Detail
+        // -----------------------------------------------------------------------
+        function openTaskDetail(taskId) {
+          rpcCall("tasks.get", { id: taskId })
+            .then(function (res) {
+              if (!res || !res.task) return;
+              state.taskDetails.set(taskId, res);
+              renderTaskModal(res);
+            })
+            .catch(function (err) {
+              // Try from local state
+              var task = state.tasks.find(function (t) {
+                return t.id === taskId;
+              });
+              if (task)
+                renderTaskModal({ task: task, steps: [], report: null, waitCondition: null });
+            });
+        }
+
+        function renderTaskModal(data) {
+          var task = data.task;
+          var modal = document.getElementById("task-modal");
+          document.getElementById("modal-task-title").textContent = task.title;
+          document.getElementById("modal-task-status").innerHTML =
+            '<span class="status-badge ' + task.status + '">' + task.status + "</span>";
+
+          var body = document.getElementById("modal-task-body");
+          var html = '<div class="detail-grid">';
+
+          // Left column
+          html += "<div>";
+          html += '<div class="detail-section"><div class="detail-label">Objective</div>';
+          html +=
+            '<div class="detail-value">' +
+            escapeHtml(getObjectiveTitle(task.objectiveId)) +
+            "</div></div>";
+
+          html += '<div class="detail-section"><div class="detail-label">ID</div>';
+          html +=
+            '<div class="detail-value" style="font-size:11px;color:var(--text-faint)">' +
+            escapeHtml(task.id) +
+            "</div></div>";
+
+          if (task.assignedSkill) {
+            html += '<div class="detail-section"><div class="detail-label">Assigned Skill</div>';
+            html +=
+              '<div class="detail-value"><span class="skill-badge">' +
+              escapeHtml(task.assignedSkill) +
+              "</span></div></div>";
+          }
+
+          html += '<div class="detail-section"><div class="detail-label">Priority</div>';
+          html += '<div class="detail-value">' + (task.priority || 0) + "</div></div>";
+
+          html += "</div>";
+
+          // Right column
+          html += "<div>";
+          html += '<div class="detail-section"><div class="detail-label">Created</div>';
+          html += '<div class="detail-value">' + formatDateTime(task.createdAt) + "</div></div>";
+
+          if (task.startedAt) {
+            html += '<div class="detail-section"><div class="detail-label">Started</div>';
+            html += '<div class="detail-value">' + formatDateTime(task.startedAt) + "</div></div>";
+          }
+
+          if (task.completedAt) {
+            html += '<div class="detail-section"><div class="detail-label">Completed</div>';
+            html +=
+              '<div class="detail-value">' + formatDateTime(task.completedAt) + "</div></div>";
+          }
+
+          html += '<div class="detail-section"><div class="detail-label">Duration</div>';
+          html +=
+            '<div class="detail-value">' +
+            durationStr(task.startedAt || task.createdAt, task.completedAt) +
+            "</div></div>";
+
+          if (task.retryCount > 0) {
+            html += '<div class="detail-section"><div class="detail-label">Retries</div>';
+            html +=
+              '<div class="detail-value">' +
+              task.retryCount +
+              " / " +
+              task.maxRetries +
+              "</div></div>";
+          }
+
+          html += "</div></div>"; // close grid
+
+          // Description
+          if (task.description) {
+            html += '<div class="detail-section"><div class="detail-label">Description</div>';
+            html +=
+              '<div class="detail-value"><pre>' +
+              escapeHtml(task.description) +
+              "</pre></div></div>";
+          }
+
+          // Error
+          if (task.error) {
+            html += '<div class="detail-section"><div class="detail-label">Error</div>';
+            html +=
+              '<div class="detail-value"><pre style="color:var(--failed)">' +
+              escapeHtml(task.error) +
+              "</pre></div></div>";
+          }
+
+          // Dependencies
+          if (task.dependsOn && task.dependsOn.length > 0) {
+            html += '<div class="detail-section"><div class="detail-label">Dependencies</div>';
+            html += '<div class="deps-list">';
+            task.dependsOn.forEach(function (depId) {
+              var depTask = state.tasks.find(function (t) {
+                return t.id === depId;
+              });
+              var depTitle = depTask ? depTask.title : shortId(depId);
+              var depStatus = depTask ? depTask.status : "?";
+              html += '<div class="dep-item"><span class="dep-arrow">&rarr;</span> ';
+              html += '<span class="status-badge ' + depStatus + '">' + depStatus + "</span> ";
+              html += escapeHtml(depTitle) + "</div>";
+            });
+            html += "</div></div>";
+          }
+
+          // Wait Condition
+          if (data.waitCondition) {
+            var wc = data.waitCondition;
+            html += '<div class="detail-section"><div class="detail-label">Wait Condition</div>';
+            html += '<div class="detail-value">';
+            html += "Event: <strong>" + escapeHtml(wc.eventName) + "</strong>";
+            if (wc.timeoutAt) {
+              html += "<br>Timeout: " + formatDateTime(wc.timeoutAt);
+            }
+            if (wc.filter) {
+              html += "<br>Filter: <code>" + escapeHtml(JSON.stringify(wc.filter)) + "</code>";
+            }
+            html += "</div></div>";
+          }
+
+          // Steps
+          if (data.steps && data.steps.length > 0) {
+            html += '<div class="detail-section"><div class="detail-label">Step Checkpoints</div>';
+            html += '<div class="step-list">';
+            data.steps.forEach(function (step) {
+              var icon = step.status === "completed" ? "&#10003;" : "&#10007;";
+              var iconClass = step.status === "completed" ? "completed" : "failed";
+              html += '<div class="step-item">';
+              html += '<span class="step-icon ' + iconClass + '">' + icon + "</span>";
+              html += "<span>" + escapeHtml(step.stepName) + "</span>";
+              if (step.completedAt) {
+                html +=
+                  '<span style="margin-left:auto;color:var(--text-faint);font-size:10px">' +
+                  formatTime(step.completedAt) +
+                  "</span>";
+              }
+              html += "</div>";
+            });
+            html += "</div></div>";
+          }
+
+          // Report
+          if (data.report) {
+            html +=
+              '<div class="detail-section"><div class="detail-label">Report: ' +
+              escapeHtml(data.report.title) +
+              "</div>";
+            html +=
+              '<div class="detail-value" style="margin-bottom:4px;font-size:11px;color:var(--text-dim)">' +
+              escapeHtml(data.report.summary) +
+              "</div>";
+            html +=
+              '<div class="detail-value"><pre>' +
+              escapeHtml(data.report.content.slice(0, 2000)) +
+              "</pre></div></div>";
+          }
+
+          body.innerHTML = html;
+          modal.classList.add("active");
+        }
+
+        function closeTaskModal() {
+          document.getElementById("task-modal").classList.remove("active");
+        }
+
+        // -----------------------------------------------------------------------
+        // Rendering: Kanban
+        // -----------------------------------------------------------------------
+        function renderKanbanView() {
+          var board = document.getElementById("kanban-board");
+          var filteredTasks = getFilteredTasks();
+
+          var html = "";
+          KANBAN_COLUMNS.forEach(function (col) {
+            var columnTasks = filteredTasks.filter(function (t) {
+              return t.status === col.status;
+            });
+            // Sort: higher priority first, then by creation time
+            columnTasks.sort(function (a, b) {
+              if (b.priority !== a.priority) return b.priority - a.priority;
+              return a.createdAt - b.createdAt;
+            });
+
+            html += '<div class="kanban-column">';
+            html += '<div class="column-header">';
+            html += '<div class="column-title">';
+            html += '<span class="column-dot" style="background:' + col.color + '"></span>';
+            html += col.label;
+            html += "</div>";
+            html += '<span class="column-count">' + columnTasks.length + "</span>";
+            html += "</div>";
+            html += '<div class="column-body">';
+
+            if (columnTasks.length === 0) {
+              html +=
+                '<div style="padding:16px;text-align:center;color:var(--text-faint);font-size:11px">No tasks</div>';
+            }
+
+            columnTasks.forEach(function (task) {
+              html += renderTaskCard(task);
+            });
+
+            html += "</div></div>";
+          });
+
+          board.innerHTML = html;
+
+          // Attach click handlers
+          board.querySelectorAll(".task-card").forEach(function (card) {
+            card.addEventListener("click", function () {
+              openTaskDetail(card.getAttribute("data-task-id"));
+            });
+          });
+        }
+
+        function renderTaskCard(task) {
+          var objTitle = getObjectiveTitle(task.objectiveId);
+          var timeStr = "";
+          if (task.status === "running" && task.startedAt) {
+            timeStr = durationStr(task.startedAt);
+          } else if (task.status === "completed" && task.completedAt) {
+            timeStr = durationStr(task.startedAt, task.completedAt);
+          } else {
+            timeStr = timeAgo(task.updatedAt);
+          }
+
+          var html = '<div class="task-card" data-task-id="' + escapeHtml(task.id) + '">';
+          html += '<div class="task-card-title">' + escapeHtml(task.title) + "</div>";
+          html += '<div class="task-card-objective">' + escapeHtml(objTitle) + "</div>";
+          html += '<div class="task-card-meta">';
+
+          if (task.assignedSkill) {
+            html += '<span class="skill-badge">' + escapeHtml(task.assignedSkill) + "</span>";
+          }
+
+          if (task.priority > 5) {
+            html += '<span class="priority-badge high">P' + task.priority + "</span>";
+          } else if (task.priority > 0) {
+            html += '<span class="priority-badge medium">P' + task.priority + "</span>";
+          }
+
+          if (task.retryCount > 0) {
+            html +=
+              '<span class="retry-badge">retry ' +
+              task.retryCount +
+              "/" +
+              task.maxRetries +
+              "</span>";
+          }
+
+          html += '<span class="time-badge">' + timeStr + "</span>";
+
+          if (task.dependsOn && task.dependsOn.length > 0) {
+            html +=
+              '<span class="time-badge" title="Depends on ' +
+              task.dependsOn.length +
+              ' task(s)">dep:' +
+              task.dependsOn.length +
+              "</span>";
+          }
+
+          html += "</div></div>";
+          return html;
+        }
+
+        function getFilteredTasks() {
+          return state.tasks.filter(function (t) {
+            if (state.filterSkill && t.assignedSkill !== state.filterSkill) return false;
+            if (state.filterObjective && t.objectiveId !== state.filterObjective) return false;
+            return true;
+          });
+        }
+
+        // -----------------------------------------------------------------------
+        // Rendering: Objectives
+        // -----------------------------------------------------------------------
+        function renderObjectivesView() {
+          var container = document.getElementById("objectives-list");
+          var filtered = state.objectives.filter(function (o) {
+            if (state.filterObjStatus && o.status !== state.filterObjStatus) return false;
+            return true;
+          });
+
+          if (filtered.length === 0) {
+            container.innerHTML =
+              '<div class="empty-state">' +
+              '<div class="empty-state-icon">&#9678;</div>' +
+              '<div class="empty-state-title">No objectives</div>' +
+              '<div class="empty-state-hint">Objectives will appear when tasks are created via the manager agent.</div>' +
+              "</div>";
+            return;
+          }
+
+          var html = "";
+          filtered.forEach(function (obj) {
+            var progress = obj.progress || {
+              total: 0,
+              completed: 0,
+              failed: 0,
+              running: 0,
+              waiting: 0,
+              ready: 0,
+              pending: 0,
+              scheduled: 0,
+              cancelled: 0,
+            };
+            var total = progress.total || 1;
+            var completedPct = ((progress.completed / total) * 100).toFixed(1);
+            var runningPct = ((progress.running / total) * 100).toFixed(1);
+            var waitingPct = ((progress.waiting / total) * 100).toFixed(1);
+            var readyPct = ((progress.ready / total) * 100).toFixed(1);
+            var failedPct = ((progress.failed / total) * 100).toFixed(1);
+            var cancelledPct = ((progress.cancelled / total) * 100).toFixed(1);
+
+            html += '<div class="objective-card">';
+            html += '<div class="objective-header">';
+            html += '<div class="objective-title">' + escapeHtml(obj.title) + "</div>";
+            html += '<span class="status-badge ' + obj.status + '">' + obj.status + "</span>";
+            html += "</div>";
+
+            if (obj.description) {
+              html +=
+                '<div class="objective-description">' +
+                escapeHtml(obj.description.slice(0, 200)) +
+                "</div>";
+            }
+
+            html += '<div class="objective-progress">';
+            html += '<div class="progress-bar-track">';
+            html +=
+              '<div class="progress-segment completed" style="width:' + completedPct + '%"></div>';
+            html +=
+              '<div class="progress-segment running" style="width:' + runningPct + '%"></div>';
+            html +=
+              '<div class="progress-segment waiting" style="width:' + waitingPct + '%"></div>';
+            html += '<div class="progress-segment ready" style="width:' + readyPct + '%"></div>';
+            html += '<div class="progress-segment failed" style="width:' + failedPct + '%"></div>';
+            html +=
+              '<div class="progress-segment cancelled" style="width:' + cancelledPct + '%"></div>';
+            html += "</div>";
+            html += '<div class="progress-stats">';
+            html +=
+              '<span class="progress-stat"><span class="progress-stat-dot" style="background:var(--completed)"></span>' +
+              progress.completed +
+              " done</span>";
+            html +=
+              '<span class="progress-stat"><span class="progress-stat-dot" style="background:var(--running)"></span>' +
+              progress.running +
+              " running</span>";
+            if (progress.waiting > 0)
+              html +=
+                '<span class="progress-stat"><span class="progress-stat-dot" style="background:var(--waiting)"></span>' +
+                progress.waiting +
+                " waiting</span>";
+            if (progress.failed > 0)
+              html +=
+                '<span class="progress-stat"><span class="progress-stat-dot" style="background:var(--failed)"></span>' +
+                progress.failed +
+                " failed</span>";
+            html +=
+              '<span class="progress-stat" style="margin-left:auto;color:var(--text-faint)">' +
+              progress.completed +
+              "/" +
+              progress.total +
+              " total</span>";
+            html += "</div>";
+            html += "</div>";
+
+            html += '<div class="objective-meta">';
+            html += "<span>Priority: " + (obj.priority || 0) + "</span>";
+            html += "<span>Proposed by: " + (obj.proposedBy || "user") + "</span>";
+            html += "<span>Created: " + formatDateTime(obj.createdAt) + "</span>";
+            if (obj.completedAt)
+              html += "<span>Completed: " + formatDateTime(obj.completedAt) + "</span>";
+            html += "</div>";
+
+            html += "</div>";
+          });
+
+          container.innerHTML = html;
+        }
+
+        // -----------------------------------------------------------------------
+        // Rendering: Audit Log
+        // -----------------------------------------------------------------------
+        function renderAuditView() {
+          var tbody = document.getElementById("audit-tbody");
+          var filtered = state.auditLog.filter(function (e) {
+            if (state.filterAuditEntity) {
+              var q = state.filterAuditEntity.toLowerCase();
+              var matchId = (e.entityId || "").toLowerCase().indexOf(q) >= 0;
+              var matchTitle = (e.entityTitle || "").toLowerCase().indexOf(q) >= 0;
+              if (!matchId && !matchTitle) return false;
+            }
+            if (state.filterAuditAction && e.action !== state.filterAuditAction) return false;
+            return true;
+          });
+
+          // Show newest first, but keep option to reverse
+          var sorted = filtered.slice().reverse();
+
+          if (sorted.length === 0) {
+            tbody.innerHTML =
+              '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-faint)">No audit entries</td></tr>';
+            return;
+          }
+
+          var html = "";
+          // Limit to 500 rows for performance
+          var display = sorted.slice(0, 500);
+          display.forEach(function (entry) {
+            html += "<tr>";
+            html +=
+              '<td style="color:var(--text-faint);font-size:11px">' +
+              formatDateTime(entry.time) +
+              "</td>";
+            html += "<td>";
+            html +=
+              '<span style="color:var(--text-dim);font-size:10px">' + entry.entityType + "</span> ";
+            html +=
+              '<span title="' +
+              escapeHtml(entry.entityId) +
+              '">' +
+              escapeHtml(entry.entityTitle || shortId(entry.entityId)) +
+              "</span>";
+            html += "</td>";
+            html +=
+              '<td><span class="audit-action ' +
+              entry.action +
+              '">' +
+              escapeHtml(entry.action) +
+              "</span></td>";
+            html += "<td>";
+            if (entry.fromStatus || entry.toStatus) {
+              html += '<span class="audit-transition">';
+              if (entry.fromStatus) {
+                html +=
+                  '<span class="status-badge ' +
+                  entry.fromStatus +
+                  '">' +
+                  entry.fromStatus +
+                  "</span>";
+                html += '<span class="audit-arrow">&rarr;</span>';
+              }
+              html +=
+                '<span class="status-badge ' + entry.toStatus + '">' + entry.toStatus + "</span>";
+              html += "</span>";
+            }
+            html += "</td>";
+            html += '<td style="color:var(--text-dim)">' + escapeHtml(entry.actor) + "</td>";
+            html +=
+              '<td style="color:var(--text-faint);max-width:200px;overflow:hidden;text-overflow:ellipsis">' +
+              escapeHtml(entry.detail) +
+              "</td>";
+            html += "</tr>";
+          });
+
+          tbody.innerHTML = html;
+        }
+
+        // -----------------------------------------------------------------------
+        // Rendering: Org Structure
+        // -----------------------------------------------------------------------
+        function renderOrgView() {
+          var container = document.getElementById("org-tree");
+
+          if (state.objectives.length === 0) {
+            container.innerHTML =
+              '<div class="empty-state">' +
+              '<div class="empty-state-icon">&#9673;</div>' +
+              '<div class="empty-state-title">No org structure</div>' +
+              '<div class="empty-state-hint">The org tree populates when objectives and tasks are created.</div>' +
+              "</div>";
+            return;
+          }
+
+          var html = "";
+          state.objectives.forEach(function (obj) {
+            // Get tasks for this objective
+            var objTasks = state.tasks.filter(function (t) {
+              return t.objectiveId === obj.id;
+            });
+
+            // Apply org filters
+            if (state.filterOrgSkill) {
+              objTasks = objTasks.filter(function (t) {
+                return t.assignedSkill === state.filterOrgSkill;
+              });
+            }
+
+            // Role filter: "manager" shows only objective headers, "worker" shows only tasks with skills
+            if (state.filterOrgRole === "manager" && objTasks.length === 0) {
+              // Still show objective header for managers
+            }
+            if (state.filterOrgRole === "worker") {
+              objTasks = objTasks.filter(function (t) {
+                return t.assignedSkill;
+              });
+              if (objTasks.length === 0) return;
+            }
+
+            var progress = obj.progress || { total: 0, completed: 0, failed: 0 };
+
+            html += '<div class="org-objective">';
+            html += '<div class="org-objective-header">';
+            html += '<div class="org-objective-title">';
+            html += '<span class="status-badge ' + obj.status + '">' + obj.status + "</span>";
+            html += escapeHtml(obj.title);
+            html += "</div>";
+            html += '<div class="org-objective-meta">';
+            html += "<span>Agent: " + escapeHtml(obj.agentId) + "</span>";
+            html += "<span>" + progress.completed + "/" + progress.total + " tasks</span>";
+            html += "<span>" + timeAgo(obj.createdAt) + "</span>";
+            html += "</div>";
+            html += "</div>";
+
+            if (objTasks.length > 0 && state.filterOrgRole !== "manager") {
+              // Group by assigned skill
+              var bySkill = {};
+              objTasks.forEach(function (t) {
+                var skill = t.assignedSkill || "(unassigned)";
+                if (!bySkill[skill]) bySkill[skill] = [];
+                bySkill[skill].push(t);
+              });
+
+              html += '<div class="org-tasks">';
+              Object.keys(bySkill)
+                .sort()
+                .forEach(function (skill) {
+                  bySkill[skill].forEach(function (task) {
+                    html += '<div class="org-task">';
+                    html += '<span class="org-task-connector">&boxur;</span>';
+                    html +=
+                      '<span class="status-badge ' + task.status + '">' + task.status + "</span>";
+                    html += '<span class="org-task-title">' + escapeHtml(task.title) + "</span>";
+                    if (task.assignedSkill) {
+                      html +=
+                        '<span class="org-task-skill">' +
+                        escapeHtml(task.assignedSkill) +
+                        "</span>";
+                    }
+                    if (task.dependsOn && task.dependsOn.length > 0) {
+                      var depNames = task.dependsOn.map(function (depId) {
+                        var depTask = state.tasks.find(function (t2) {
+                          return t2.id === depId;
+                        });
+                        return depTask ? depTask.title.slice(0, 20) : shortId(depId);
+                      });
+                      html +=
+                        '<span class="org-task-deps">depends: ' +
+                        escapeHtml(depNames.join(", ")) +
+                        "</span>";
+                    }
+                    html += "</div>";
+                  });
+                });
+              html += "</div>";
+            }
+
+            html += "</div>";
+          });
+
+          container.innerHTML = html;
+        }
+
+        // -----------------------------------------------------------------------
+        // View Switching & Rendering
+        // -----------------------------------------------------------------------
+        var VIEW_TITLES = {
+          kanban: "Kanban Board",
+          objectives: "Objectives",
+          audit: "Audit Log",
+          org: "Org Structure",
+        };
+
+        function switchView(viewName) {
+          state.activeView = viewName;
+
+          // Update nav
+          document.querySelectorAll(".nav-item").forEach(function (item) {
+            item.classList.toggle("active", item.getAttribute("data-view") === viewName);
+          });
+
+          // Update views
+          document.querySelectorAll(".view").forEach(function (v) {
+            v.classList.toggle("active", v.id === "view-" + viewName);
+          });
+
+          // Update title
+          document.getElementById("view-title").textContent = VIEW_TITLES[viewName] || viewName;
+
+          renderCurrentView();
+        }
+
+        function renderCurrentView() {
+          switch (state.activeView) {
+            case "kanban":
+              renderKanbanView();
+              break;
+            case "objectives":
+              renderObjectivesView();
+              break;
+            case "audit":
+              renderAuditView();
+              break;
+            case "org":
+              renderOrgView();
+              break;
+          }
+        }
+
+        // -----------------------------------------------------------------------
+        // Event Binding
+        // -----------------------------------------------------------------------
+        function bindEvents() {
+          // Nav items
+          document.querySelectorAll(".nav-item").forEach(function (item) {
+            item.addEventListener("click", function () {
+              switchView(item.getAttribute("data-view"));
+            });
+          });
+
+          // Refresh
+          document.getElementById("btn-refresh").addEventListener("click", function () {
+            if (state.connected) loadAllData();
+          });
+
+          // Modal close
+          document.getElementById("modal-close").addEventListener("click", closeTaskModal);
+          document.getElementById("task-modal").addEventListener("click", function (e) {
+            if (e.target === this) closeTaskModal();
+          });
+
+          // Keyboard
+          document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape") closeTaskModal();
+          });
+
+          // Filters
+          document.getElementById("filter-skill").addEventListener("change", function () {
+            state.filterSkill = this.value;
+            renderCurrentView();
+          });
+          document.getElementById("filter-objective").addEventListener("change", function () {
+            state.filterObjective = this.value;
+            renderCurrentView();
+          });
+          document.getElementById("filter-obj-status").addEventListener("change", function () {
+            state.filterObjStatus = this.value;
+            renderCurrentView();
+          });
+          document.getElementById("filter-audit-entity").addEventListener("input", function () {
+            state.filterAuditEntity = this.value;
+            renderCurrentView();
+          });
+          document.getElementById("filter-audit-action").addEventListener("change", function () {
+            state.filterAuditAction = this.value;
+            renderCurrentView();
+          });
+          document.getElementById("filter-org-role").addEventListener("change", function () {
+            state.filterOrgRole = this.value;
+            renderCurrentView();
+          });
+          document.getElementById("filter-org-skill").addEventListener("change", function () {
+            state.filterOrgSkill = this.value;
+            renderCurrentView();
+          });
+        }
+
+        // -----------------------------------------------------------------------
+        // Auto-refresh timer — re-render to update relative timestamps
+        // -----------------------------------------------------------------------
+        function startAutoRefreshTimestamps() {
+          setInterval(function () {
+            if (state.activeView === "kanban") renderKanbanView();
+          }, 15000);
+        }
+
+        // -----------------------------------------------------------------------
+        // Init
+        // -----------------------------------------------------------------------
+        function init() {
+          bindEvents();
+          renderCurrentView();
+          connect();
+          startAutoRefreshTimestamps();
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", init);
+        } else {
+          init();
+        }
+      })();
+    </script>
+  </body>
+</html>

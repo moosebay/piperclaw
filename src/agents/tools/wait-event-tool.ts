@@ -1,7 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { registerWaitCondition } from "../../tasks/events.js";
-import { getTaskStore } from "../../tasks/service.runtime.js";
+import { getTaskStore, resumeTaskFromEvent } from "../../tasks/service.runtime.js";
 import { type AnyAgentTool, jsonResult, readStringParam, readNumberParam } from "./common.js";
 
 // ---------------------------------------------------------------------------
@@ -96,11 +96,28 @@ After calling this tool, your session will end. A new session will be created wi
         store.addStep(taskId, stepName, stepResult);
       }
 
-      // Register wait condition
-      const waitId = registerWaitCondition(store, taskId, eventName, filter, timeoutMs);
-
-      // Transition task: running -> waiting
+      // Transition task: running -> waiting (before registering wait to avoid TOCTOU)
       store.updateTaskStatus(taskId, "waiting");
+
+      // Register wait condition — also checks for already-pending events
+      const { waitConditionId, matched, matchedEventData } = registerWaitCondition(
+        store,
+        taskId,
+        eventName,
+        filter,
+        timeoutMs,
+      );
+
+      // If a pending event was already found, resume immediately instead of suspending
+      if (matched) {
+        store.updateTaskStatus(taskId, "running");
+        void resumeTaskFromEvent(taskId, matchedEventData);
+        return jsonResult({
+          status: "matched",
+          waitConditionId,
+          message: `Event "${eventName}" was already pending. Task will resume immediately.`,
+        });
+      }
 
       // Fire task_waiting hook
       const hookRunner = getGlobalHookRunner();
@@ -112,7 +129,7 @@ After calling this tool, your session will end. A new session will be created wi
 
       return jsonResult({
         status: "suspended",
-        waitConditionId: waitId,
+        waitConditionId,
         message: `Task suspended. Will resume when event "${eventName}" arrives.`,
       });
     },

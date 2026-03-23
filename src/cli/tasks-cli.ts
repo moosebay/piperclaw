@@ -127,6 +127,58 @@ export function registerTasksCli(program: Command) {
       },
     );
 
+  objectives
+    .command("cancel")
+    .description("Cancel an objective and all its non-terminal tasks")
+    .argument("<id>", "Objective ID")
+    .action(async (id: string) => {
+      const handle = getStore();
+      try {
+        const store = handle.store;
+        const objective = store.getObjective(id);
+        if (!objective) {
+          console.error(`Objective ${id} not found`);
+          process.exitCode = 1;
+          return;
+        }
+        const count = store.cancelObjective(id);
+        console.log(`Cancelled objective ${id} (${count} tasks cancelled)`);
+      } finally {
+        closeIfOwned(handle);
+      }
+    });
+
+  objectives
+    .command("audit")
+    .description("Show audit log for an objective")
+    .argument("<id>", "Objective ID")
+    .option("--json", "Output JSON", false)
+    .option("--limit <n>", "Max entries", "50")
+    .action(async (id: string, opts: { json?: boolean; limit: string }) => {
+      const handle = getStore();
+      try {
+        const store = handle.store;
+        const limit = Number.parseInt(opts.limit, 10) || 50;
+        const entries = store.getAuditLog("objective", id, limit);
+        if (opts.json) {
+          console.log(JSON.stringify(entries, null, 2));
+        } else {
+          if (entries.length === 0) {
+            console.log("No audit log entries.");
+            return;
+          }
+          for (const e of entries) {
+            const ts = new Date(e.createdAt).toISOString();
+            const status = e.fromStatus && e.toStatus ? ` ${e.fromStatus} → ${e.toStatus}` : "";
+            const actor = e.actor ? ` (${e.actor})` : "";
+            console.log(`${ts}  ${e.action}${status}${actor}`);
+          }
+        }
+      } finally {
+        closeIfOwned(handle);
+      }
+    });
+
   // ---------------------------------------------------------------------------
   // openclaw tasks
   // ---------------------------------------------------------------------------
@@ -390,6 +442,37 @@ export function registerTasksCli(program: Command) {
             const wait = store.getWaitConditionForTask(t.id);
             const eventInfo = wait ? ` (waiting for: ${wait.eventName})` : "";
             console.log(`${t.id}  ${t.title}${eventInfo}`);
+          }
+        }
+      } finally {
+        closeIfOwned(handle);
+      }
+    });
+
+  tasks
+    .command("audit")
+    .description("Show audit log for a task")
+    .argument("<id>", "Task ID")
+    .option("--json", "Output JSON", false)
+    .option("--limit <n>", "Max entries", "50")
+    .action(async (id: string, opts: { json?: boolean; limit: string }) => {
+      const handle = getStore();
+      try {
+        const store = handle.store;
+        const limit = Number.parseInt(opts.limit, 10) || 50;
+        const entries = store.getAuditLog("task", id, limit);
+        if (opts.json) {
+          console.log(JSON.stringify(entries, null, 2));
+        } else {
+          if (entries.length === 0) {
+            console.log("No audit log entries.");
+            return;
+          }
+          for (const e of entries) {
+            const ts = new Date(e.createdAt).toISOString();
+            const status = e.fromStatus && e.toStatus ? ` ${e.fromStatus} → ${e.toStatus}` : "";
+            const actor = e.actor ? ` (${e.actor})` : "";
+            console.log(`${ts}  ${e.action}${status}${actor}`);
           }
         }
       } finally {

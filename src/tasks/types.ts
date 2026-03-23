@@ -206,3 +206,29 @@ export type ObjectiveFilter = {
   agentId?: string;
   status?: ObjectiveStatus;
 };
+
+// --- Audit Log ---
+
+export type AuditLogEntityType = "task" | "objective";
+
+export type AuditLogAction =
+  | "created"
+  | "status_changed"
+  | "claimed"
+  | "completed"
+  | "retried"
+  | "approved"
+  | "rejected"
+  | "cancelled";
+
+export type AuditLogRecord = {
+  id: string;
+  entityType: AuditLogEntityType;
+  entityId: string;
+  action: AuditLogAction;
+  fromStatus?: string;
+  toStatus?: string;
+  actor?: string;
+  detail?: Record<string, unknown>;
+  createdAt: number;
+};

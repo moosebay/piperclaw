@@ -97,6 +97,7 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "tasks.reports.list",
     "tasks.reports.get",
     "tasks.steps.list",
+    "tasks.audit.list",
   ],
   [WRITE_SCOPE]: [
     "send",
