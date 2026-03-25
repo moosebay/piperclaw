@@ -39,8 +39,8 @@ export class PiperApp extends LitElement {
       --text-secondary: #a3a3a3;
       --text-muted: #737373;
       --border: #262626;
-      --accent: #3b82f6;
-      --accent-hover: #2563eb;
+      --accent: #e84545;
+      --accent-hover: #c73a3a;
       --sidebar-width: 220px;
 
       display: flex;
@@ -339,7 +339,10 @@ export class PiperApp extends LitElement {
     const tab = this.tab;
     return html`
       <nav class="sidebar">
-        <div class="sidebar-brand"><span>P</span>iper</div>
+        <div class="sidebar-brand">
+          <img src="/piper/piperclaw-mascot.png" alt="PiperClaw" style="width:48px;height:48px;border-radius:8px;margin-bottom:8px;display:block" />
+          <span>P</span>iper
+        </div>
 
         <div class="sidebar-section">
           <div class="sidebar-section-label">Dashboard</div>
@@ -484,8 +487,8 @@ export class PiperApp extends LitElement {
     }
 
     // --- Org chart styles ---
-    const accent = "#3b82f6";
-    const accentDim = "#3b82f630";
+    const accent = "#e84545";
+    const accentDim = "#e8454530";
     const nodeBg = "#0f1923";
     const nodeBorder = `1px solid ${accent}`;
     const lineColor = accent;
@@ -563,7 +566,7 @@ export class PiperApp extends LitElement {
                     padding:14px 32px;text-align:center;min-width:200px;
                     box-shadow:0 0 16px ${accentDim};
                   ">
-                    <div style="font-weight:700;font-size:15px;color:var(--text)">${mgr.piper.type ?? mgr.name}</div>
+                    <div style="font-weight:700;font-size:15px;color:var(--text)">${mgr.piper.displayName ?? mgr.piper.type ?? mgr.name}</div>
                   </div>
 
                   <!-- Workers under this manager -->
@@ -600,7 +603,7 @@ export class PiperApp extends LitElement {
                               padding:10px 14px;text-align:center;min-width:150px;
                               box-shadow:0 0 8px ${accentDim};margin-bottom:10px;
                             ">
-                              <div style="font-weight:600;font-size:13px;color:var(--text)">${w.piper.type ?? w.name}</div>
+                              <div style="font-weight:600;font-size:13px;color:var(--text)">${w.piper.displayName ?? w.piper.type ?? w.name}</div>
                             </div>
 
                             <!-- Capability tags -->
@@ -644,7 +647,7 @@ export class PiperApp extends LitElement {
                     background:${nodeBg};border:1px solid var(--border);border-radius:8px;
                     padding:10px 16px;text-align:center;min-width:120px;opacity:0.6;
                   ">
-                    <div style="font-weight:600;font-size:13px;color:var(--text)">${w.piper.type ?? w.name}</div>
+                    <div style="font-weight:600;font-size:13px;color:var(--text)">${w.piper.displayName ?? w.piper.type ?? w.name}</div>
                   </div>
                 `,
                 )}

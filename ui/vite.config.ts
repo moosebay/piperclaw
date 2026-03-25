@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
@@ -46,6 +47,18 @@ export default defineConfig(() => {
       strictPort: true,
     },
     plugins: [
+      {
+        name: "copy-piper-assets",
+        closeBundle() {
+          const src = path.resolve(here, "public/piperclaw-mascot.png");
+          const dest = path.resolve(here, "../dist/control-ui/piper/piperclaw-mascot.png");
+          const destDir = path.dirname(dest);
+          fs.mkdirSync(destDir, { recursive: true });
+          if (fs.existsSync(src)) {
+            fs.copyFileSync(src, dest);
+          }
+        },
+      },
       {
         name: "control-ui-dev-stubs",
         configureServer(server) {
